@@ -1,0 +1,5 @@
+plugins:
+  - package: oci://REGISTRY/fullsend-deck-frontend:0.1.0!red-hat-developer-hub-backstage-plugin-fullsend-deck
+    disabled: false
+  - package: oci://REGISTRY/fullsend-deck-backend:0.1.0!red-hat-developer-hub-backstage-plugin-fullsend-deck-backend
+    disabled: false

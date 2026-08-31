@@ -2,8 +2,8 @@
 
 An NFS-only, read-only operations dashboard for Fullsend agent work. It exposes:
 
-- a global `/fullsend-deck` page;
-- an entity-scoped **Fullsend Deck** catalog tab;
+- an owned global `/fullsend-deck` page;
+- entity-scoped deep links on that page via the `entity` query parameter;
 - a runtime-validating API registered through `ApiBlueprint`; and
 - lazy Attention, Executions, Cost, and Data health experiences.
 
@@ -14,8 +14,8 @@ agent exit status are intentionally separate concepts.
 ## Frontend system and design system
 
 The package exports only New Frontend System features created with
-`createFrontendPlugin`, `PageBlueprint`, `EntityContentBlueprint`, and
-`ApiBlueprint`. The example app discovers them through NFS package discovery.
+`createFrontendPlugin`, `PageBlueprint`, and `ApiBlueprint`. The example app
+discovers them through NFS package discovery.
 
 Product components use `@backstage/ui` and its theme tokens. Direct MUI,
 Material UI v4, PatternFly, `@backstage/core-components`, and legacy plugin
