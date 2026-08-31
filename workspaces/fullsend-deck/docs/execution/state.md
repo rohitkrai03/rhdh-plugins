@@ -14,6 +14,7 @@
 | 07 — backend      | Complete    | `b305d2f067673583b77fce334372931af5f4da81` | immutable install; config; typecheck; lint; 20 product tests; builds; authenticated live smoke  |
 | 08 — frontend     | Complete    | `b2b6a07c88a7ec107c1183ba81a242004c2b4544` | immutable install; typecheck; lint; 11 frontend tests; 32 workspace tests; builds; browser QA   |
 | 09 — release      | Implemented | `5f1e0c34cebd924bbddbdfb8d10f6ffd4f8d1c89` | immutable install; version audit; 34 tests; PostgreSQL; builds; dynamic/OCI and contract checks |
+| Runtime audit     | Complete    | `54638d42b04be6062c8a87573c0ce747c8b474de` | 35 tests; strict typecheck; lint; builds; dynamic packages; contract checks                     |
 
 ## Phase 06 handoff
 
@@ -136,6 +137,26 @@
 - Release configuration, install, canary, permissions, and rollback procedures
   are in `docs/release.md`; intentional differences and exact evidence are in
   `docs/conformance.md`.
+
+## Post-program runtime audit
+
+- **Implementation commit:** `54638d42b04be6062c8a87573c0ce747c8b474de`.
+- **Correctness fixes:** successful reprocessing now clears every historical
+  quarantine record for the artifact. Collection failures retain the configured
+  source identity. Overall sync health is `failed` only when every configured
+  source fails and `partial` when another source remains usable.
+- **Source scope:** GitLab and Jira are not configurable RHDH sources yet. They
+  no longer appear as synthetic warnings that permanently degrade a healthy
+  GitHub- or filesystem-only installation.
+- **Test reliability:** the full coverage suite is serialized because native
+  SQLite workers were occasionally force-terminated during parallel teardown.
+  Open-handle detection found no retained handle in the serial run.
+- **Verification:** formatting, strict typecheck, lint, 12 suites / 35 tests,
+  full builds, standalone fixture equivalence, frontend/backend dynamic export
+  and packaging, and dynamic artifact validation passed.
+- **Deviation:** the PostgreSQL test remains opt-in and was not repeated in this
+  audit; its Phase 09 PostgreSQL 16 evidence remains current. Exact RHDH 2.1
+  installation remains the external release gate.
 
 ## Next prerequisite
 
