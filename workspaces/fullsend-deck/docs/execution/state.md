@@ -3,17 +3,17 @@
 ## Baseline
 
 - RHDH repository base: `f715573e5d1afc30443e1f25787b33312946535b`.
-- Standalone stable source: `cb59073eab6e76822d16c82bf8b6a2fec418b482`
+- Standalone stable source: `c6222b2a007ffa5c79265f8b206360005ab6d15c`
   (Phase 05 handoff; verify before every deliberate port).
 
 ## Phase status
 
 | Phase             | Status      | Result commit                              | Verification                                                                                    |
 | ----------------- | ----------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| 06 — CLI scaffold | Complete    | `9059a0966ed16762e6356a6a3e4467aa1424853f` | immutable install; Backstage info; typecheck; lint; 10 tests; build; live initialization        |
-| 07 — backend      | Complete    | `d3b6ffda15b4b0e3ace9a2827efa61b9394618f3` | immutable install; config; typecheck; lint; 20 product tests; builds; authenticated live smoke  |
-| 08 — frontend     | Complete    | `5e7ed45c913d6a2c57964a6d1f208b14ee69c4c3` | immutable install; typecheck; lint; 11 frontend tests; 32 workspace tests; builds; browser QA   |
-| 09 — release      | Implemented | `eaf3bccbe944650ef95f2b726639ab25568191ff` | immutable install; version audit; 34 tests; PostgreSQL; builds; dynamic/OCI and contract checks |
+| 06 — CLI scaffold | Complete    | `04508b9b63286b31001902358327ef0e607a0091` | immutable install; Backstage info; typecheck; lint; 10 tests; build; live initialization        |
+| 07 — backend      | Complete    | `b305d2f067673583b77fce334372931af5f4da81` | immutable install; config; typecheck; lint; 20 product tests; builds; authenticated live smoke  |
+| 08 — frontend     | Complete    | `b2b6a07c88a7ec107c1183ba81a242004c2b4544` | immutable install; typecheck; lint; 11 frontend tests; 32 workspace tests; builds; browser QA   |
+| 09 — release      | Implemented | `5f1e0c34cebd924bbddbdfb8d10f6ffd4f8d1c89` | immutable install; version audit; 34 tests; PostgreSQL; builds; dynamic/OCI and contract checks |
 
 ## Phase 06 handoff
 
@@ -45,7 +45,7 @@
 ## Phase 07 handoff
 
 - Stable behavior was ported deliberately from standalone commit
-  `cb59073eab6e76822d16c82bf8b6a2fec418b482`; no cross-repository package or
+  `c6222b2a007ffa5c79265f8b206360005ab6d15c`; no cross-repository package or
   runtime dependency was introduced.
 - The common package owns runtime schemas, fixture contracts, and the
   `fullsend-deck.read` permission. Every versioned response contains schema and
@@ -105,7 +105,7 @@
 
 ## Phase 09 handoff
 
-- Implementation commit `eaf3bccbe944650ef95f2b726639ab25568191ff`
+- Phase commit `5f1e0c34cebd924bbddbdfb8d10f6ffd4f8d1c89`
   exports independent NFS frontend and backend dynamic packages. The backend
   embeds the common contract package, so installation requires no unpublished
   workspace or cross-repository dependency.
