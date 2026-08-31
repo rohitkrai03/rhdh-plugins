@@ -28,12 +28,39 @@ const artifact: ArtifactRun = {
   conclusion: 'success',
   createdAt: '2026-08-31T11:00:00.000Z',
   files: {
-    'run-summary.json': JSON.stringify({
-      agent: 'codex',
-      model: 'gpt-5',
-      work_item_id: 'fullsend-dev/fullsend#42',
-      exit_code: 1,
-      usage: { cost: 1.25 },
+    'run-telemetry.jsonl': JSON.stringify({
+      resourceSpans: [
+        {
+          scopeSpans: [
+            {
+              spans: [
+                {
+                  name: 'run',
+                  traceId: 'trace-7001',
+                  startTimeUnixNano: '1788174000000000000',
+                  endTimeUnixNano: '1788174300000000000',
+                  attributes: [
+                    { key: 'fullsend.agent', value: { stringValue: 'codex' } },
+                    {
+                      key: 'fullsend.work_item_id',
+                      value: { stringValue: 'fullsend-dev/fullsend#42' },
+                    },
+                    {
+                      key: 'gen_ai.request.model',
+                      value: { stringValue: 'gpt-5' },
+                    },
+                    { key: 'exit_code', value: { intValue: '1' } },
+                    {
+                      key: 'fullsend.cost_usd',
+                      value: { stringValue: '1.25' },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
     }),
   },
 };
@@ -56,8 +83,9 @@ describe('IngestionService', () => {
     };
   };
 
-  it('normalizes sources into a deterministic, partial snapshot', async () => {
+  it('normalizes a healthy source into a deterministic snapshot', async () => {
     const source: ArtifactSource = {
+      source: 'github',
       collect: jest.fn().mockResolvedValue({
         source: 'github',
         workItems: [fixtureWorkItem],
@@ -88,17 +116,20 @@ describe('IngestionService', () => {
       readiness: 'actionable',
       automationState: 'failed',
     });
-    expect(result?.sync.sources).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ source: 'gitlab', state: 'unsupported' }),
-        expect.objectContaining({ source: 'jira', state: 'unsupported' }),
-      ]),
+    expect(result?.sync.state).toBe('healthy');
+    expect(result?.sync.sources).toEqual([
+      expect.objectContaining({ source: 'github', state: 'healthy' }),
+    ]);
+    expect(result?.partial).toEqual({ isPartial: false, diagnostics: [] });
+    expect(store.clearQuarantineForArtifact).toHaveBeenCalledWith(
+      artifact.sourceKey,
     );
     expect(persisted()?.ingestionKey).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it('quarantines malformed runs without discarding usable source data', async () => {
     const source: ArtifactSource = {
+      source: 'filesystem',
       collect: jest.fn().mockResolvedValue({
         source: 'filesystem',
         workItems: [fixtureWorkItem],
@@ -131,6 +162,72 @@ describe('IngestionService', () => {
         expect.objectContaining({ source: artifact.sourceKey, level: 'error' }),
       ]),
     );
+  });
+
+  it('reports a configured source failure by its stable identity', async () => {
+    const source: ArtifactSource = {
+      source: 'github',
+      collect: jest.fn().mockRejectedValue(new Error('GitHub unavailable')),
+    };
+    const { store } = createStore();
+    const service = new IngestionService(
+      config,
+      store,
+      [source],
+      mockServices.logger.mock(),
+    );
+
+    const result = await service.runOnce(new Date('2026-08-31T12:00:00.000Z'));
+
+    expect(result?.sync.state).toBe('failed');
+    expect(result?.sync.sources).toEqual([
+      expect.objectContaining({
+        source: 'github',
+        state: 'failed',
+        error: 'GitHub unavailable',
+      }),
+    ]);
+    expect(result?.partial.diagnostics).toEqual([
+      expect.objectContaining({
+        source: 'github',
+        level: 'error',
+        message: 'GitHub unavailable',
+      }),
+    ]);
+  });
+
+  it('reports partial health when one configured source still succeeds', async () => {
+    const filesystem: ArtifactSource = {
+      source: 'filesystem',
+      collect: jest.fn().mockResolvedValue({
+        source: 'filesystem',
+        workItems: [fixtureWorkItem],
+        runs: [],
+        attemptedAt: '2026-08-31T12:00:00.000Z',
+        succeededAt: '2026-08-31T12:00:00.000Z',
+        rateLimitRemaining: null,
+        diagnostics: [],
+      }),
+    };
+    const github: ArtifactSource = {
+      source: 'github',
+      collect: jest.fn().mockRejectedValue(new Error('GitHub unavailable')),
+    };
+    const { store } = createStore();
+    const service = new IngestionService(
+      config,
+      store,
+      [filesystem, github],
+      mockServices.logger.mock(),
+    );
+
+    const result = await service.runOnce(new Date('2026-08-31T12:00:00.000Z'));
+
+    expect(result?.sync.state).toBe('partial');
+    expect(result?.sync.sources).toEqual([
+      expect.objectContaining({ source: 'filesystem', state: 'healthy' }),
+      expect.objectContaining({ source: 'github', state: 'failed' }),
+    ]);
   });
 
   it('registers globally coordinated Backstage scheduling', async () => {
