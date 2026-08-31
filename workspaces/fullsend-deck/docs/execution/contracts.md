@@ -14,7 +14,8 @@ behavior from the standalone repository, but must not import unpublished code.
 - `ExecutionWorkItemLink`: explicit or heuristic correlation plus confidence
   and evidence.
 - `SyncStatus`: per-source health, freshness, coverage, rate limits, parser
-  version, quarantine counts, and unsupported-source diagnostics.
+  version, quarantine counts, and diagnostics for configured unsupported
+  sources.
 
 All HTTP responses carry `schemaVersion`, snapshot identity/time, partial-data
 metadata, and runtime-validated data. Canonical telemetry is parsed before

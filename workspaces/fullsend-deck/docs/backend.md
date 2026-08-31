@@ -27,9 +27,11 @@ one of the following, in parser priority order:
 contain `entityRef`, `url`, `branch`, `conclusion`, and `createdAt`.
 
 Malformed artifacts are quarantined by artifact key and parser version. They
-are retried on every ingestion and after parser upgrades. A failed ingestion
-never replaces the last completed snapshot. GitLab and Jira remain explicit
-unsupported source-health entries.
+are retried on every ingestion and after parser upgrades, and every historical
+failure for an artifact is cleared when that artifact parses successfully. A
+failed ingestion never replaces the last completed snapshot. GitLab and Jira
+are not configurable ingestion sources yet, so their absence does not degrade
+the health of a configured GitHub or filesystem source.
 
 ## Configuration example
 

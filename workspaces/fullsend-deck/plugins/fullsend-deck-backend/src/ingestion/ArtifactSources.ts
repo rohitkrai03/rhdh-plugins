@@ -13,10 +13,13 @@ import type { FullsendDeckConfig, GitHubRepositoryConfig } from '../config';
 import type { ArtifactRun, SourceCollection } from '../domain/types';
 
 export interface ArtifactSource {
+  readonly source: string;
   collect(now?: Date): Promise<SourceCollection>;
 }
 
 export class FilesystemArtifactSource implements ArtifactSource {
+  readonly source = 'filesystem';
+
   constructor(private readonly directory: string) {}
 
   async collect(now = new Date()): Promise<SourceCollection> {
@@ -64,6 +67,8 @@ export class FilesystemArtifactSource implements ArtifactSource {
 }
 
 export class GitHubArtifactSource implements ArtifactSource {
+  readonly source = 'github';
+
   constructor(
     private readonly config: FullsendDeckConfig,
     private readonly integrations: ScmIntegrations,

@@ -198,13 +198,9 @@ export class SnapshotStore {
     });
   }
 
-  async clearQuarantineForArtifact(
-    artifactKey: string,
-    parserVersion: string,
-  ): Promise<void> {
+  async clearQuarantineForArtifact(artifactKey: string): Promise<void> {
     await this.client(tables.quarantine)
       .where({ artifact_key: artifactKey })
-      .whereNot({ parser_version: parserVersion })
       .delete();
   }
 
