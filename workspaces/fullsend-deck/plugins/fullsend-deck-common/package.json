@@ -7,7 +7,6 @@
     "url": "https://github.com/redhat-developer/rhdh-plugins",
     "directory": "workspaces/fullsend-deck/plugins/fullsend-deck-common"
   },
-  "private": true,
   "description": "Common functionalities for the fullsend-deck plugin",
   "main": "src/index.ts",
   "types": "src/index.ts",
@@ -40,5 +39,9 @@
   },
   "files": [
     "dist"
-  ]
+  ],
+  "dependencies": {
+    "@backstage/plugin-permission-common": "^0.9.10",
+    "zod": "^3.25.76 || ^4.0.0"
+  }
 }
