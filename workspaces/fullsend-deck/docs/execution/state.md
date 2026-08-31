@@ -8,12 +8,12 @@
 
 ## Phase status
 
-| Phase             | Status      | Result commit                              | Verification                                                                                   |
-| ----------------- | ----------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| 06 — CLI scaffold | Complete    | `9059a0966ed16762e6356a6a3e4467aa1424853f` | immutable install; Backstage info; typecheck; lint; 10 tests; build; live initialization       |
-| 07 — backend      | Complete    | `d3b6ffda15b4b0e3ace9a2827efa61b9394618f3` | immutable install; config; typecheck; lint; 20 product tests; builds; authenticated live smoke |
-| 08 — frontend     | Complete    | `5e7ed45c913d6a2c57964a6d1f208b14ee69c4c3` | immutable install; typecheck; lint; 11 frontend tests; 32 workspace tests; builds; browser QA  |
-| 09 — release      | Not started | —                                          | —                                                                                              |
+| Phase             | Status      | Result commit                              | Verification                                                                                    |
+| ----------------- | ----------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| 06 — CLI scaffold | Complete    | `9059a0966ed16762e6356a6a3e4467aa1424853f` | immutable install; Backstage info; typecheck; lint; 10 tests; build; live initialization        |
+| 07 — backend      | Complete    | `d3b6ffda15b4b0e3ace9a2827efa61b9394618f3` | immutable install; config; typecheck; lint; 20 product tests; builds; authenticated live smoke  |
+| 08 — frontend     | Complete    | `5e7ed45c913d6a2c57964a6d1f208b14ee69c4c3` | immutable install; typecheck; lint; 11 frontend tests; 32 workspace tests; builds; browser QA   |
+| 09 — release      | Implemented | `eaf3bccbe944650ef95f2b726639ab25568191ff` | immutable install; version audit; 34 tests; PostgreSQL; builds; dynamic/OCI and contract checks |
 
 ## Phase 06 handoff
 
@@ -36,8 +36,11 @@
   directly depends on neither MUI nor PatternFly. Its browser console therefore
   inherits `findDOMNode` warnings from the generated app shell, but no warning
   originates in a Fullsend component.
-- A live PostgreSQL instance and an RHDH 2.1 distribution are not part of this
-  scaffold environment; Phase 09 owns those integration checks.
+- The exact RHDH 2.1 distribution is not available in this environment. The
+  public community `2.1` image tag returned `manifest unknown` on 2026-08-31;
+  the cached `next` image reports RHDH 1.11.0 and lacks this workspace's
+  Backstage UI/runtime versions. Exact 2.1 installation remains an explicit
+  release gate in `docs/conformance.md`.
 
 ## Phase 07 handoff
 
@@ -69,9 +72,10 @@
 ## Phase 08 handoff
 
 - The generated TODO implementation was deleted. `ApiBlueprint` installs a
-  runtime-validating client, `PageBlueprint` lazily loads the global route, and
-  `EntityContentBlueprint` lazily loads the catalog entity tab. Both pages share
-  product behavior while entity requests carry the canonical entity ref.
+  runtime-validating client and `PageBlueprint` lazily loads the owned
+  `/fullsend-deck` route. Phase 09 removed the earlier Catalog entity tab after
+  the product direction was clarified: entity context is an optional validated
+  deep-link filter on the owned page.
 - Attention, Executions, Cost, and Data health use one time-window control and
   keep readiness, automation, checks, workflow conclusion, agent exit,
   correlation confidence, cost, freshness, and source coverage independently
@@ -83,24 +87,60 @@
 - Interaction tests cover runtime API validation, safe errors, global/entity
   scope, loading/empty/partial/error states, time-window reloads, search,
   separate execution outcomes, canonical correlation, evidence dialog Escape,
-  and explicit trigger-focus restoration.
+  explicit trigger-focus restoration, and fail-closed malformed entity refs.
 - Verification passed: immutable install, formatting, full typecheck, lint, 4
   frontend suites / 11 tests, 12 workspace suites / 32 tests, frontend package
-  build, and full workspace build. The global and entity lazy route chunks were
-  each approximately 17.3 kB uncompressed in the example production build.
-- Live browser QA exercised global and entity routes, guest authentication,
-  permission-backed reads, all tabs, the time window, dark mode, and a 375 px
-  work-first layout without horizontal overflow. The entity route issued
-  `component:default/example-website` filters to the backend.
+  build, and full workspace build. Before Phase 09 removed the entity
+  extension, the global and entity lazy route chunks were each approximately
+  17.3 kB uncompressed in the example production build.
+- Live browser QA exercised global and entity-filtered page modes, guest
+  authentication, permission-backed reads, all tabs, the time window, dark
+  mode, and a 375 px work-first layout without horizontal overflow. The
+  entity-filtered request issued `component:default/example-website` filters to
+  the backend.
 - The combined `backstage-cli repo start` development coordinator hit an
   upstream `DevDataStore.load` IPC timeout. Starting the generated frontend and
   backend packages independently worked and supplied the live acceptance run;
   production `build:all` also passed.
 
+## Phase 09 handoff
+
+- Implementation commit `eaf3bccbe944650ef95f2b726639ab25568191ff`
+  exports independent NFS frontend and backend dynamic packages. The backend
+  embeds the common contract package, so installation requires no unpublished
+  workspace or cross-repository dependency.
+- `@red-hat-developer-hub/cli` 2.0.0 with `ts-morph` 28.0.0 generated the
+  exports. Frontend metadata declares `@backstage/FrontendPlugin`, contains the
+  Module Federation manifest and no Scalprum assets. Both artifacts declare
+  Backstage 1.54.0 support.
+- The current CLI has no `versions:check` command. A
+  `versions:bump --release 1.54.0 --skip-install` audit traversed the generated
+  dependency set; the generator-selected package ranges remain the source of
+  truth. Immutable install passed with the previously recorded upstream peer
+  warnings.
+- Verification passed: full typecheck, lint, formatting, 13 suites / 34 tests,
+  full build, publishable-directory packaging, dynamic-artifact validation, and
+  standalone fixture equivalence for work, workflow, execution, and canonical
+  link records.
+- PostgreSQL 16 passed schema migration, round-trip persistence, and concurrent
+  idempotent snapshot writes. A full example backend registered and completed
+  global ingestion; unauthenticated API returned 401 while a guest-authenticated
+  permission-backed entity request returned schema-valid 200 data.
+- Final local OCI validation images are
+  `localhost/fullsend-deck-frontend:0.1.0` at
+  `98912152469569aa40a8908b085daae8df4c6622667cef1d693aca13db3bffa8`
+  (7,205,118 bytes) and `localhost/fullsend-deck-backend:0.1.0` at
+  `bf2aa2182eef41a20333c68006cc94c789fe525422501298bc403b3dde135e21`
+  (10,577,088 bytes). Production publishing must use reviewed immutable
+  registry tags or digests.
+- Release configuration, install, canary, permissions, and rollback procedures
+  are in `docs/release.md`; intentional differences and exact evidence are in
+  `docs/conformance.md`.
+
 ## Next prerequisite
 
-Begin Phase 09 from the Phase 08 handoff commit. Re-read the release phase,
-build dynamic frontend and backend artifacts, compare canonical fixture output
-with standalone, and validate the strongest available RHDH 2.1/PostgreSQL,
-authentication, permissions, scheduling, entity, theme, and accessibility
-evidence. Record any unavailable external conformance environment explicitly.
+Supply the exact RHDH 2.1 distribution or supported image, publish the two OCI
+artifacts to a test registry, and execute the documented canary checklist. Do
+not declare RHDH 2.1 compatibility until that external gate passes. After two
+meaningful standalone and plugin releases, reconsider shared-package
+extraction using actual contract churn; do not introduce it earlier.

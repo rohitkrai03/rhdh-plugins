@@ -1,0 +1,34 @@
+app:
+  # RHDH 2.1 uses the New Frontend System. Dynamic feature discovery must stay
+  # enabled; no legacy frontend compatibility layer is required.
+  packages: all
+
+permission:
+  enabled: true
+
+backend:
+  database:
+    client: pg
+    connection:
+      host: ${POSTGRES_HOST}
+      port: ${POSTGRES_PORT}
+      user: ${POSTGRES_USER}
+      password: ${POSTGRES_PASSWORD}
+      database: ${POSTGRES_DATABASE}
+
+fullsendDeck:
+  enabled: true
+  schedule:
+    frequencyMinutes: 5
+    timeoutMinutes: 4
+    initialDelaySeconds: 5
+  sources:
+    github:
+      artifactNamePrefix: fullsend
+      maxArtifactsPerRepository: 25
+      repositories:
+        - repository: fullsend-dev/fullsend
+          host: github.com
+          entityRef: component:default/fullsend
+    # filesystem:
+    #   directory: /var/lib/fullsend-deck/artifacts

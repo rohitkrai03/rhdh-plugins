@@ -1,4 +1,3 @@
-import { EntityProvider } from '@backstage/plugin-catalog-react';
 import {
   renderInTestApp,
   type TestApiPair,
@@ -12,7 +11,7 @@ import {
   fixtureWorkItemsResponse,
 } from '../../testData';
 import { fullsendDeckApiRef, type FullsendDeckApi } from '../../api';
-import { EntityFullsendDeckPage } from '../EntityFullsendDeckPage';
+import { FullsendDeckPage } from '../FullsendDeckPage';
 import { FullsendDeckSurface } from './FullsendDeckSurface';
 
 describe('FullsendDeckSurface', () => {
@@ -72,25 +71,31 @@ describe('FullsendDeckSurface', () => {
     });
   });
 
-  it('forwards canonical entity scope from the catalog context', async () => {
+  it('forwards canonical entity scope from the owned page deep link', async () => {
     const api = createApi();
-    render(
-      <EntityProvider
-        entity={{
-          apiVersion: 'backstage.io/v1alpha1',
-          kind: 'Component',
-          metadata: { name: 'payments', namespace: 'default' },
-        }}
-      >
-        <EntityFullsendDeckPage />
-      </EntityProvider>,
-      api,
+    window.history.replaceState(
+      {},
+      '',
+      '/fullsend-deck?entity=component:default/payments',
     );
-    expect(await screen.findByText('Entity · payments')).toBeVisible();
+    render(<FullsendDeckPage />, api);
+    expect(
+      await screen.findByText('Entity · component:default/payments'),
+    ).toBeVisible();
     expect(api.getWorkItems).toHaveBeenCalledWith({
       entityRef: 'component:default/payments',
       limit: 100,
     });
+    window.history.replaceState({}, '', '/fullsend-deck');
+  });
+
+  it('fails closed for a malformed entity deep link', async () => {
+    const api = createApi();
+    window.history.replaceState({}, '', '/fullsend-deck?entity=not-an-entity');
+    render(<FullsendDeckPage />, api);
+    expect(await screen.findByText('Invalid entity scope')).toBeVisible();
+    expect(api.getOverview).not.toHaveBeenCalled();
+    window.history.replaceState({}, '', '/fullsend-deck');
   });
 
   it('shows explicit empty, partial, and safe error states', async () => {
