@@ -86,10 +86,7 @@ export class IngestionService {
               )}`,
             });
           }
-          await this.store.clearQuarantineForArtifact(
-            run.sourceKey,
-            TELEMETRY_PARSER_VERSION,
-          );
+          await this.store.clearQuarantineForArtifact(run.sourceKey);
         } catch (error) {
           const message = safeMessage(error);
           await this.store.quarantine(
@@ -116,23 +113,7 @@ export class IngestionService {
       const sourceDiagnostics = collections.flatMap(
         collection => collection.diagnostics,
       );
-      const unsupported: PartialData['diagnostics'] = [
-        {
-          source: 'gitlab',
-          level: 'warning',
-          message: 'GitLab ingestion is not implemented',
-        },
-        {
-          source: 'jira',
-          level: 'warning',
-          message: 'Jira ingestion is not implemented',
-        },
-      ];
-      const diagnostics = [
-        ...sourceDiagnostics,
-        ...parserDiagnostics,
-        ...unsupported,
-      ];
+      const diagnostics = [...sourceDiagnostics, ...parserDiagnostics];
       const sync = buildSyncStatus(
         snapshotAt,
         collections,
@@ -196,8 +177,9 @@ export class IngestionService {
     );
     return results.map((result, index) => {
       if (result.status === 'fulfilled') return result.value;
+      const source = this.sources[index]?.source ?? `source-${index + 1}`;
       return {
-        source: `source-${index + 1}`,
+        source,
         workItems: [],
         runs: [],
         attemptedAt: now.toISOString(),
@@ -205,7 +187,7 @@ export class IngestionService {
         rateLimitRemaining: null,
         diagnostics: [
           {
-            source: `source-${index + 1}`,
+            source,
             level: 'error',
             message: safeMessage(result.reason),
           },
@@ -237,27 +219,7 @@ function buildSyncStatus(
     state: overallSyncState(collections, diagnostics),
     parserVersion: TELEMETRY_PARSER_VERSION,
     quarantinedArtifacts,
-    sources: [
-      ...configured,
-      {
-        source: 'gitlab',
-        state: 'unsupported',
-        lastAttemptAt: null,
-        lastSuccessAt: null,
-        error: 'GitLab ingestion is not implemented',
-        coverage: null,
-        rateLimitRemaining: null,
-      },
-      {
-        source: 'jira',
-        state: 'unsupported',
-        lastAttemptAt: null,
-        lastSuccessAt: null,
-        error: 'Jira ingestion is not implemented',
-        coverage: null,
-        rateLimitRemaining: null,
-      },
-    ],
+    sources: configured,
   };
 }
 
@@ -278,6 +240,7 @@ function overallSyncState(
   diagnostics: PartialData['diagnostics'],
 ): SyncStatus['state'] {
   if (collections.length === 0) return 'empty';
+  if (collections.every(collection => !collection.succeededAt)) return 'failed';
   return diagnostics.length > 0 ? 'partial' : 'healthy';
 }
 

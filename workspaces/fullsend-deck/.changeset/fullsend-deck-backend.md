@@ -9,3 +9,6 @@ artifact-first RHDH backend with authenticated snapshot APIs, scheduled
 ingestion, persistence, permissions, auditing, and source health.
 Export self-contained dynamic artifacts and serialize concurrent PostgreSQL
 snapshot writes safely.
+Keep unconfigured sources out of health calculations, distinguish complete
+source failure from partial availability, preserve stable source identities in
+errors, and clear quarantine history when an artifact recovers.

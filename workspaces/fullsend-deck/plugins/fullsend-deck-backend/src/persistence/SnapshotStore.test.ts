@@ -80,7 +80,7 @@ describe('SnapshotStore', () => {
     expect((await store.readLatestSnapshot())?.id).toBe(stable.id);
   });
 
-  it('versions quarantine retries by parser version', async () => {
+  it('clears every parser-version failure after an artifact recovers', async () => {
     const knex = await databases.init('SQLITE_3');
     const store = await SnapshotStore.create(
       mockServices.database.mock({
@@ -100,17 +100,8 @@ describe('SnapshotStore', () => {
       'new parser failure',
       fixtureSnapshotAt,
     );
-    await store.clearQuarantineForArtifact(
-      'artifact-1',
-      TELEMETRY_PARSER_VERSION,
-    );
+    await store.clearQuarantineForArtifact('artifact-1');
 
-    expect(await store.listQuarantine()).toEqual([
-      expect.objectContaining({
-        artifactKey: 'artifact-1',
-        parserVersion: TELEMETRY_PARSER_VERSION,
-        retryCount: 1,
-      }),
-    ]);
+    expect(await store.listQuarantine()).toEqual([]);
   });
 });
