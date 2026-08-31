@@ -63,7 +63,9 @@ The plugin mount is `/api/fullsend-deck`; the versioned resources are:
 
 Responses contain schema version, immutable snapshot ID/time, and partial-data
 diagnostics. Work-item and execution lists use cursors bound to the snapshot.
-Global scope uses no entity filter; entity pages pass a canonical `entityRef`.
+Global scope uses no entity filter. An owned-page deep link such as
+`/fullsend-deck?entity=component:default/fullsend` passes the canonical
+`entityRef` without installing a tab on every Catalog entity.
 
 ## Authorization and auditing
 

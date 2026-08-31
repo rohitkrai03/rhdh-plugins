@@ -1,4 +1,6 @@
 dist
 dist-types
+dist-dynamic
+dist-dynamic-packages
 coverage
 .vscode

@@ -6,6 +6,8 @@ The plugin is read-only and reads Fullsend artifacts directly; it does not
 require the standalone Fullsend Deck deployment.
 
 Read `docs/execution/README.md` before making changes.
+Release packaging, installation, conformance evidence, and rollback are in
+`docs/release.md` and `docs/conformance.md`.
 
 To start the example app:
 
