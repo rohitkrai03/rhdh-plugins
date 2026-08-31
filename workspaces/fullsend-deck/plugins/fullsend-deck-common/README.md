@@ -1,5 +1,5 @@
 # @red-hat-developer-hub/backstage-plugin-fullsend-deck-common
 
-Welcome to the common package for the fullsend-deck plugin!
-
-_This plugin was created through the Backstage CLI_
+Runtime-validated domain and HTTP contracts, canonical conformance fixtures,
+and the `fullsend-deck.read` permission shared by the independently published
+Fullsend Deck frontend and backend packages.

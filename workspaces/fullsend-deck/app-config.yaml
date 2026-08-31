@@ -99,6 +99,20 @@ app:
 organization:
   name: My Company
 
+fullsendDeck:
+  enabled: true
+  schedule:
+    frequencyMinutes: 5
+    timeoutMinutes: 4
+    initialDelaySeconds: 5
+  # The example app writes an empty, truthful snapshot until at least one
+  # read-only source is configured. GitHub credentials come from integrations.
+  sources:
+    github:
+      artifactNamePrefix: fullsend
+      maxArtifactsPerRepository: 25
+      repositories: []
+
 backend:
   # Used for enabling authentication, secret is shared by all backend plugins
   # See https://backstage.io/docs/auth/service-to-service-auth for

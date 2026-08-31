@@ -1,17 +1,19 @@
-# fullsend-deck
+# Fullsend Deck backend
 
-This plugin backend was templated using the Backstage CLI. You should replace this text with a description of your plugin backend.
+The backend is self-contained: it discovers read-only GitHub work and Fullsend
+artifacts, persists normalized snapshots with Backstage's database service, and
+serves the frontend without a standalone Deck deployment.
 
 ## Installation
 
-This plugin is installed via the `@red-hat-developer-hub/backstage-plugin-fullsend-deck-backend` package. To install it to your backend package, run the following command:
+It is a new-backend-system `createBackendPlugin` package. Install it with:
 
 ```bash
 # From your root directory
 yarn --cwd packages/backend add @red-hat-developer-hub/backstage-plugin-fullsend-deck-backend
 ```
 
-Then add the plugin to your backend in `packages/backend/src/index.ts`:
+Then add it to the backend:
 
 ```ts
 const backend = createBackend();
@@ -21,10 +23,9 @@ backend.add(
 );
 ```
 
-## Development
+All `/v1` routes require Backstage authentication and the
+`fullsend-deck.read` permission. `/health` is the only unauthenticated route.
+GitHub tokens or app credentials come from Backstage `integrations`.
 
-This plugin backend can be started in a standalone mode from directly in this
-package with `yarn start`. It is a limited setup that is most convenient when
-developing the plugin backend itself.
-
-If you want to run the entire project, including the frontend, run `yarn start` from the root directory.
+See `../../docs/backend.md` for configuration, source layout, failure behavior,
+and the API surface.

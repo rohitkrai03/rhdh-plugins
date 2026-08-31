@@ -8,12 +8,12 @@
 
 ## Phase status
 
-| Phase             | Status      | Result commit                              | Verification                                                                             |
-| ----------------- | ----------- | ------------------------------------------ | ---------------------------------------------------------------------------------------- |
-| 06 — CLI scaffold | Complete    | `9059a0966ed16762e6356a6a3e4467aa1424853f` | immutable install; Backstage info; typecheck; lint; 10 tests; build; live initialization |
-| 07 — backend      | Not started | —                                          | —                                                                                        |
-| 08 — frontend     | Not started | —                                          | —                                                                                        |
-| 09 — release      | Not started | —                                          | —                                                                                        |
+| Phase             | Status      | Result commit                              | Verification                                                                                   |
+| ----------------- | ----------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| 06 — CLI scaffold | Complete    | `9059a0966ed16762e6356a6a3e4467aa1424853f` | immutable install; Backstage info; typecheck; lint; 10 tests; build; live initialization       |
+| 07 — backend      | Complete    | `d3b6ffda15b4b0e3ace9a2827efa61b9394618f3` | immutable install; config; typecheck; lint; 20 product tests; builds; authenticated live smoke |
+| 08 — frontend     | Not started | —                                          | —                                                                                              |
+| 09 — release      | Not started | —                                          | —                                                                                              |
 
 ## Phase 06 handoff
 
@@ -38,9 +38,36 @@
 - A live PostgreSQL instance and an RHDH 2.1 distribution are not part of this
   scaffold environment; Phase 09 owns those integration checks.
 
+## Phase 07 handoff
+
+- Stable behavior was ported deliberately from standalone commit
+  `cb59073eab6e76822d16c82bf8b6a2fec418b482`; no cross-repository package or
+  runtime dependency was introduced.
+- The common package owns runtime schemas, fixture contracts, and the
+  `fullsend-deck.read` permission. Every versioned response contains schema and
+  immutable snapshot metadata plus partial-data diagnostics.
+- The backend reads GitHub through Backstage integrations (token and GitHub App
+  credentials) and optional filesystem exports. Canonical OTLP JSONL precedes
+  three legacy fallbacks. Explicit and heuristic correlations remain labelled.
+- Backstage database transactions provide idempotent completed snapshots,
+  rollback, and parser-versioned quarantine. The global scheduler prevents
+  overlapping ingestion across replicas. API reads have no provider side
+  effects.
+- `/api/fullsend-deck/v1` exposes overview, work items/detail, executions, and
+  sync status. Both user and service credentials require permission; every
+  allowed or rejected read is audited. `/health` alone is unauthenticated.
+- Verification passed: immutable install, configuration schema check, full
+  typecheck, lint, 2 common and 18 backend tests, 11 workspace suites / 25 tests,
+  package builds, and full workspace build. A live example backend migrated,
+  scheduled and completed an empty snapshot, then returned a validated 200
+  overview through guest auth and the permission backend.
+- GitHub HTTP/ZIP behavior is fixture-tested but was not pointed at a live
+  repository. SQLite runs in tests and the example app; live PostgreSQL remains
+  a Phase 09 conformance check.
+
 ## Next prerequisite
 
-Begin Phase 07 from the Phase 06 handoff commit. Re-read the backend phase and
-contracts, verify the actual scaffold, and port only behavior from standalone
-commit `cb59073eab6e76822d16c82bf8b6a2fec418b482` without adding a cross-repository
-dependency.
+Begin Phase 08 from the Phase 07 handoff commit. Re-read the frontend phase and
+contracts, inspect the actual API, delete all generated TODO UI, and keep the
+frontend NFS-only. Use Backstage UI first, enforce direct MUI/PatternFly/legacy
+import bans, and provide both global and entity-scoped lazy extensions.
