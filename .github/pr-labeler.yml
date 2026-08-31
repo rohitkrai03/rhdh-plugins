@@ -30,6 +30,10 @@ workspace/extensions:
   - changed-files:
       - any-glob-to-any-file: ['workspaces/extensions/**']
 
+workspace/fullsend-deck:
+  - changed-files:
+      - any-glob-to-any-file: ['workspaces/fullsend-deck/**']
+
 workspace/global-header:
   - changed-files:
       - any-glob-to-any-file: ['workspaces/global-header/**']

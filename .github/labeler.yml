@@ -22,6 +22,9 @@ workspace/dcm:
 workspace/extensions:
   - 'Workspace\\s*extensions'
 
+workspace/fullsend-deck:
+  - 'Workspace\\s*fullsend-deck'
+
 workspace/global-header:
   - 'Workspace\\s*global-header'
 
