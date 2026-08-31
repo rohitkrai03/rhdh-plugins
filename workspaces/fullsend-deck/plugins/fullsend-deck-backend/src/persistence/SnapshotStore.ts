@@ -85,14 +85,34 @@ export class SnapshotStore {
       }
 
       const id = randomUUID();
-      await tx(tables.snapshots).insert({
-        id,
-        ingestion_key: input.ingestionKey,
-        snapshot_at: input.snapshotAt,
-        sync_json: JSON.stringify(input.sync),
-        partial_json: JSON.stringify(input.partial),
-        completed: false,
-      });
+      await tx(tables.snapshots)
+        .insert({
+          id,
+          ingestion_key: input.ingestionKey,
+          snapshot_at: input.snapshotAt,
+          sync_json: JSON.stringify(input.sync),
+          partial_json: JSON.stringify(input.partial),
+          completed: false,
+        })
+        .onConflict('ingestion_key')
+        .ignore();
+
+      // ON CONFLICT waits for a concurrent writer on PostgreSQL. Re-read the
+      // owner after that wait so horizontally concurrent ingesters return the
+      // committed snapshot instead of surfacing a unique-key failure.
+      const owner = await tx(tables.snapshots)
+        .select('id', 'completed')
+        .where({ ingestion_key: input.ingestionKey })
+        .first();
+      if (!owner) throw new Error('Snapshot reservation could not be read');
+      if (String(owner.id) !== id) {
+        if (!owner.completed) {
+          throw new Error('Snapshot ingestion is already in progress');
+        }
+        const snapshot = await this.readById(String(owner.id), tx);
+        if (!snapshot) throw new Error('Completed snapshot could not be read');
+        return snapshot;
+      }
       await this.insertPayloads(
         tx,
         tables.workItems,

@@ -9,15 +9,17 @@ views. Workflow status never substitutes for agent status, and execution
 reliability never substitutes for work readiness.
 
 One `24h`, `7d`, or `30d` selection controls overview, execution, and cost data.
-Work items are snapshot-current rather than windowed. Global and entity pages
-render the same product component; the entity extension supplies a canonical
-Backstage entity ref to every scoped backend request.
+Work items are snapshot-current rather than windowed. Fullsend Deck owns the
+`/fullsend-deck` page because it is a cross-entity operations dashboard. Entity
+scope is expressed as a deep-link filter such as
+`/fullsend-deck?entity=component:default/payments`; the validated canonical ref
+is supplied to every scoped backend request. The plugin does not add a tab to
+every Catalog entity.
 
 ## NFS composition
 
 - `ApiBlueprint` installs the runtime-validating HTTP client.
 - `PageBlueprint` lazily loads the global route.
-- `EntityContentBlueprint` lazily loads the catalog entity tab.
 - `app.packages: all` in the example app enables feature discovery.
 
 No legacy plugin or compatibility wrapper is exported.
