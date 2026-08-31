@@ -8871,20 +8871,20 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@red-hat-developer-hub/backstage-plugin-fullsend-deck@workspace:plugins/fullsend-deck"
   dependencies:
+    "@backstage/catalog-model": "npm:^1.10.0"
     "@backstage/cli": "npm:^0.36.5"
-    "@backstage/core-components": "npm:^0.18.13"
     "@backstage/frontend-defaults": "npm:^0.5.5"
     "@backstage/frontend-dev-utils": "npm:^0.1.5"
     "@backstage/frontend-plugin-api": "npm:^0.18.0"
     "@backstage/frontend-test-utils": "npm:^0.6.3"
-    "@backstage/theme": "npm:^0.7.3"
+    "@backstage/plugin-catalog-react": "npm:^3.2.2"
     "@backstage/ui": "npm:^0.17.1"
+    "@red-hat-developer-hub/backstage-plugin-fullsend-deck-common": "workspace:^"
     "@testing-library/jest-dom": "npm:^6.0.0"
     "@testing-library/react": "npm:^14.0.0"
     "@testing-library/user-event": "npm:^14.0.0"
     msw: "npm:^1.0.0"
     react: "npm:^16.13.1 || ^17.0.0 || ^18.0.0"
-    react-use: "npm:^17.2.4"
   peerDependencies:
     react: ^16.13.1 || ^17.0.0 || ^18.0.0
   languageName: unknown
