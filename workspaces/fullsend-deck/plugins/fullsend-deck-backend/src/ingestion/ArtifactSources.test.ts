@@ -194,4 +194,99 @@ describe('Artifact sources', () => {
       }),
     );
   });
+
+  it('bounds artifact downloads while preserving deterministic API order', async () => {
+    const zip = new JSZip();
+    zip.file('run-telemetry.jsonl', '{"resourceSpans":[]}');
+    const archive = await zip.generateAsync({ type: 'uint8array' });
+    const artifactIds = [101, 102, 103, 104, 105, 106];
+    let activeDownloads = 0;
+    let maximumDownloads = 0;
+    const request = jest.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      const headers = { 'x-ratelimit-remaining': '4000' };
+      if (url.includes('/pulls?') || url.includes('/issues?')) {
+        return new Response('[]', { status: 200, headers });
+      }
+      if (url.includes('/actions/artifacts?')) {
+        return new Response(
+          JSON.stringify({
+            artifacts: artifactIds.map(id => ({
+              id,
+              name: `fullsend-run-${id}`,
+              expired: false,
+              archive_download_url: `https://api.github.com/archive/${id}`,
+              workflow_run: { id },
+            })),
+          }),
+          { status: 200, headers },
+        );
+      }
+      const archiveMatch = url.match(/\/archive\/(\d+)$/);
+      if (archiveMatch) {
+        activeDownloads += 1;
+        maximumDownloads = Math.max(maximumDownloads, activeDownloads);
+        await new Promise(resolve => setTimeout(resolve, 10));
+        activeDownloads -= 1;
+        return new Response(archive, { status: 200, headers });
+      }
+      const workflowMatch = url.match(/\/actions\/runs\/(\d+)$/);
+      if (workflowMatch) {
+        const id = Number(workflowMatch[1]);
+        return new Response(
+          JSON.stringify({
+            id,
+            html_url: `https://github.com/fullsend-dev/fullsend/actions/runs/${id}`,
+            head_branch: `fullsend/run-${id}`,
+            conclusion: 'success',
+            created_at: '2026-08-31T11:00:00.000Z',
+          }),
+          { status: 200, headers },
+        );
+      }
+      return new Response('', { status: 404, headers });
+    }) as typeof fetch;
+    const config: FullsendDeckConfig = {
+      enabled: true,
+      filesystemDirectory: null,
+      githubRepositories: [
+        {
+          repository: 'fullsend-dev/fullsend',
+          host: 'github.com',
+          entityRef: null,
+        },
+      ],
+      githubArtifactNamePrefix: 'fullsend',
+      maxArtifactsPerRepository: 25,
+      schedule: {
+        frequencyMinutes: 5,
+        timeoutMinutes: 4,
+        initialDelaySeconds: 5,
+      },
+    };
+    const integrations = ScmIntegrations.fromConfig(
+      new ConfigReader({
+        integrations: {
+          github: [
+            {
+              host: 'github.com',
+              apiBaseUrl: 'https://api.github.com',
+              token: 'test-token',
+            },
+          ],
+        },
+      }),
+    );
+
+    const result = await new GitHubArtifactSource(
+      config,
+      integrations,
+      request,
+    ).collect(new Date('2026-08-31T12:00:00.000Z'));
+
+    expect(maximumDownloads).toBe(4);
+    expect(result.runs.map(run => run.providerRunId)).toEqual(
+      artifactIds.map(String),
+    );
+  });
 });
