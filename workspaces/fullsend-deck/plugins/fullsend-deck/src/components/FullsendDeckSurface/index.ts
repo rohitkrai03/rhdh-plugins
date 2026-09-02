@@ -1,1 +1,1 @@
-export { FullsendDeckSurface } from './FullsendDeckSurface';
+export { FullsendDeckSurface, type DeckView } from './FullsendDeckSurface';
