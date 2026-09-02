@@ -105,13 +105,15 @@ fullsendDeck:
     frequencyMinutes: 5
     timeoutMinutes: 4
     initialDelaySeconds: 5
-  # The example app writes an empty, truthful snapshot until at least one
-  # read-only source is configured. GitHub credentials come from integrations.
+  # Example repositories mirror the standalone Deck configuration. GitHub
+  # credentials remain external and come from Backstage integrations.
   sources:
     github:
       artifactNamePrefix: fullsend
       maxArtifactsPerRepository: 25
-      repositories: []
+      repositories:
+        - repository: redhat-developer/rhdh-agentic
+        - repository: redhat-developer/rhdh-plugins
 
 backend:
   # Used for enabling authentication, secret is shared by all backend plugins
