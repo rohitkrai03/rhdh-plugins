@@ -14,58 +14,69 @@
  * limitations under the License.
  */
 
+import type { CSSProperties } from 'react';
 import type { Entity } from '@backstage/catalog-model';
 import {
-  Button,
+  Badge,
   Card,
   CardBody,
   CardFooter,
   CardHeader,
+  Flex,
+  Link,
   Tag,
   TagGroup,
   Text,
 } from '@backstage/ui';
 import { RiUserLine } from '@remixicon/react';
 
+import { useTranslation } from '../../hooks/useTranslation';
 import { getCategoryMeta } from '../../utils/categoryMeta';
-import { entityHref, getSpecField } from '../../utils/entityHelpers';
+import {
+  entityHref,
+  entityRefHref,
+  getSpecField,
+} from '../../utils/entityHelpers';
 import styles from './AiAssetCard.module.css';
 
 export interface AiAssetCardProps {
   entity: Entity;
-  onCategoryClick?: (category: string) => void;
 }
 
-export const AiAssetCard = ({ entity, onCategoryClick }: AiAssetCardProps) => {
+export const AiAssetCard = ({ entity }: AiAssetCardProps) => {
+  const { t } = useTranslation();
   const specType = getSpecField(entity, 'type');
   const owner = getSpecField(entity, 'owner');
   const categoryMeta = getCategoryMeta(specType);
   const tags = entity.metadata.tags ?? [];
   const title = entity.metadata.title ?? entity.metadata.name;
   const description = entity.metadata.description ?? '';
-  const scope = entity.metadata.annotations?.['rhdh.io/ai-asset-source'] ?? '';
+  const provider =
+    entity.metadata.annotations?.['rhdh.io/ai-asset-source'] ?? '';
+  const ownerHref = owner ? entityRefHref(owner) : undefined;
+  const CategoryIcon = categoryMeta.icon;
 
   return (
     <Card
       href={entityHref(entity)}
-      label={`View ${title} details`}
+      label={`${t('catalog.card.viewDetails')}: ${title}`}
       className={styles.card}
     >
       <CardHeader>
-        <Button
-          variant="tertiary"
+        <Badge
           size="small"
           className={styles.typeBadge}
-          style={{ color: categoryMeta.color }}
-          onPress={
-            onCategoryClick && specType
-              ? () => onCategoryClick(specType)
-              : undefined
+          style={{ '--boost-type-accent': categoryMeta.color } as CSSProperties}
+          icon={
+            <CategoryIcon
+              aria-hidden="true"
+              size={14}
+              className={styles.typeIcon}
+            />
           }
-          aria-label={`Filter by ${categoryMeta.label}`}
         >
           {categoryMeta.label}
-        </Button>
+        </Badge>
       </CardHeader>
       <CardBody className={styles.body}>
         <Text variant="title-small" className={styles.title}>
@@ -74,7 +85,7 @@ export const AiAssetCard = ({ entity, onCategoryClick }: AiAssetCardProps) => {
         {description && (
           <Text
             variant="body-small"
-            color="secondary"
+            color="primary"
             className={styles.description}
           >
             {description}
@@ -82,7 +93,7 @@ export const AiAssetCard = ({ entity, onCategoryClick }: AiAssetCardProps) => {
         )}
         {tags.length > 0 && (
           <div className={styles.tags}>
-            <TagGroup aria-label="Tags">
+            <TagGroup aria-label={t('catalog.card.tags')}>
               {tags.map(tag => (
                 <Tag key={tag} id={tag} size="small">
                   {tag}
@@ -95,23 +106,33 @@ export const AiAssetCard = ({ entity, onCategoryClick }: AiAssetCardProps) => {
       <CardFooter>
         <div className={styles.footer}>
           {owner && (
-            <>
-              <span className={styles.ownerIcon}>
+            <Flex align="center" gap="1" className={styles.metadataItem}>
+              <span className={styles.ownerIcon} aria-hidden="true">
                 <RiUserLine size={16} />
               </span>
-              <Text variant="body-x-small" color="secondary" truncate>
-                {owner}
+              <Text variant="body-x-small" color="primary">
+                {t('catalog.card.owner')}:
               </Text>
-            </>
+              {ownerHref ? (
+                <Link href={ownerHref} variant="body-x-small" truncate>
+                  {owner}
+                </Link>
+              ) : (
+                <Text variant="body-x-small" color="primary" truncate>
+                  {owner}
+                </Text>
+              )}
+            </Flex>
           )}
-          {scope && (
-            <Text
-              variant="body-x-small"
-              color="secondary"
-              className={styles.scope}
-            >
-              {scope}
-            </Text>
+          {provider && (
+            <Flex align="center" gap="1" className={styles.metadataItem}>
+              <Text variant="body-x-small" color="primary">
+                {t('catalog.card.provider')}:
+              </Text>
+              <Text variant="body-x-small" color="primary" truncate>
+                {provider}
+              </Text>
+            </Flex>
           )}
         </div>
       </CardFooter>

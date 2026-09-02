@@ -1,95 +1,95 @@
 # Entity Page Extensions
 
-> **Status: Draft** — Pre-implementation specification. Subject to change during implementation.
+> **Status: Implemented** — Uses standard Catalog composition plus focused BUI cards.
 
-NFS Blueprint extensions that render on existing catalog entity pages for AI assets. All extensions use the `isAiAsset` condition filter and do not render on non-AI entities.
+Boost entity cards use the shared `isAiAsset` filter and supplement standard Catalog About, Relations, and TechDocs. TechDocs is the only documentation tab.
 
-## Requirements
+## ADDED Requirements
 
-### Requirement: AI Asset Summary Card
+### Requirement: Summary Card
 
-#### Scenario: Summary card renders on AI entity
+The Summary card MUST render only AI-specific rationale and available-model data.
 
-- **WHEN** a developer views a catalog entity page for an AI asset
-- **THEN** the AI Asset Summary Card shows the entity's category badge, current version, source connector attribution, and lifecycle state
+#### Scenario: AI-specific summary data exists
 
-#### Scenario: Summary card absent on non-AI entity
+- **WHEN** an AI asset has `spec.rationale` or `spec.models.available`
+- **THEN** the Summary card renders those fields
+- **AND** it does not repeat the Catalog About description
+- **AND** it does not render instructions, handoff details, or RAG configuration owned by TechDocs
 
-- **WHEN** a developer views a catalog entity page for a non-AI entity (e.g., a regular Component or API)
-- **THEN** the AI Asset Summary Card is not rendered
+#### Scenario: No AI-specific summary data exists
 
-### Requirement: Download/Adopt Card
+- **WHEN** neither rationale nor available models exists
+- **THEN** the Summary card does not render
 
-#### Scenario: Git asset download
+### Requirement: Adoption Card
 
-- **WHEN** the entity has `spec.location.type: git`
-- **THEN** the card shows a Download button
-- **AND** clicking the button triggers a ZIP download via the backend proxy
-- **AND** a loading indicator is shown during download
-- **AND** an error toast is shown on failure
+The Adoption card MUST expose validated, type-specific actions without guessing unsafe commands or download URLs.
 
-#### Scenario: OCI asset pull command
+#### Scenario: Skill command
 
-- **WHEN** the entity has `spec.location.type: oci`
-- **THEN** the card shows a docker/podman segmented toggle
-- **AND** the pull command is displayed below the toggle using `spec.location.target`
-- **AND** switching the toggle instantly updates the displayed command
-- **AND** the Copy button copies the currently displayed command to clipboard
+- **WHEN** the entity type is `skill`
+- **THEN** the card copies `npx skills add <metadata.name>`
 
-#### Scenario: No location type
+#### Scenario: OCI artifact commands
 
-- **WHEN** the entity does not have `spec.location.type`
-- **THEN** the Download/Adopt Card is not rendered
+- **WHEN** a validated `oci://` remote exists
+- **THEN** Docker is selected by default and Podman is available as an alternative BUI tab
+- **AND** copied commands do not contain the `oci://` prefix
+- **AND** unsafe references containing shell metacharacters are rejected
 
-### Requirement: Version List Card
+#### Scenario: Verified GitHub repository root
 
-#### Scenario: Version list with navigation
+- **WHEN** a valid Git source is an unambiguous GitHub repository root
+- **THEN** Download ZIP links directly to the branch-agnostic GitHub zipball URL
 
-- **WHEN** the entity has multiple versions (linked by shared asset identifier)
-- **THEN** the Version List Card shows all versions
-- **AND** the current/recommended version is visually highlighted
-- **AND** clicking a version navigates to that version's catalog entity page
+#### Scenario: Source cannot be downloaded without guessing
 
-### Requirement: Usage Tab
+- **WHEN** a Git source is a subpath, a GitLab source without an explicit archive, or another supported HTTP(S) host
+- **THEN** the action is View Source
+- **AND** the frontend does not guess a branch or archive path
 
-#### Scenario: TechDocs available
+#### Scenario: MCP runtime endpoint
 
-- **WHEN** the entity has the `backstage.io/techdocs-ref` annotation
-- **THEN** the Usage tab renders TechDocs content for the entity
+- **WHEN** an MCP server provides a validated HTTP(S) remote, preferring `streamable-http`
+- **THEN** the card copies that URL
 
-#### Scenario: TechDocs not available
+#### Scenario: Clipboard result
 
-- **WHEN** the entity does not have the TechDocs annotation
-- **THEN** the Usage tab renders external links (source registry, repository, download location) from entity metadata
+- **WHEN** copying succeeds
+- **THEN** success is announced to assistive technology and cleared after a managed timer
+- **WHEN** copying fails
+- **THEN** a translated inline BUI danger Alert offers Retry
+- **AND** timers are cleaned up when the card unmounts
 
-#### Scenario: RBAC gated — permission granted
+### Requirement: Asset Location Card
 
-- **WHEN** the user has the `ai-catalog.asset.access.usage-docs` permission (or the permission is not yet registered)
-- **THEN** the Usage tab shows full usage content
+The Asset Location card MUST show deduplicated, validated Git and OCI asset sources.
 
-#### Scenario: RBAC gated — permission denied
+#### Scenario: Validated sources exist
 
-- **WHEN** the user has `ai-catalog.asset.access` but not `ai-catalog.asset.access.usage-docs`
-- **THEN** the Usage tab shows a "Contact owner for access" affordance instead of usage content
+- **WHEN** an entity has Git source locations or OCI artifact remotes
+- **THEN** `entity-card:boost/asset-location` shows every unique validated source
+- **AND** OCI references are presented without the transport prefix
+- **AND** runtime MCP endpoints are excluded
 
-#### Scenario: Tab visibility
+### Requirement: Current Version Card
 
-- **WHEN** a developer views a non-AI entity page
-- **THEN** the Usage tab is not present in the entity page tabs
+The existing version-list extension MUST present only the entity's current annotated version.
 
-### Requirement: Backend Download Proxy
+#### Scenario: Current version annotation exists
 
-#### Scenario: Successful download
+- **WHEN** `rhdh.io/ai-asset-version` is present
+- **THEN** `entity-card:boost/version-list` renders a singular Version title and that current version
+- **AND** it does not fabricate releases, commits, or `spec.versions` history
 
-- **WHEN** the frontend calls `GET /api/boost/catalog/download` with a valid entity ref
-- **THEN** the backend resolves `spec.location.target`, authenticates to GitHub via Backstage SCM integrations, and streams the ZIP archive response
+### Requirement: Standard Documentation Composition
 
-#### Scenario: Unauthorized download
+Boost MUST supplement the standard Catalog About, Relations, and TechDocs composition without registering a separate Usage tab.
 
-- **WHEN** the user lacks catalog entity read permission for the requested entity
-- **THEN** the backend returns 403
+#### Scenario: AI asset entity page is composed
 
-#### Scenario: Download failure
-
-- **WHEN** the GitHub API is unreachable or returns an error
-- **THEN** the backend returns an appropriate error status with a message
+- **WHEN** a developer views an AI asset entity page
+- **THEN** standard Catalog About, Relations, and TechDocs provide general metadata, relationships, and documentation
+- **AND** Boost does not register `entity-content:boost/usage`
+- **AND** existing documentation permission constants and backend enforcement remain unchanged for separately scoped work

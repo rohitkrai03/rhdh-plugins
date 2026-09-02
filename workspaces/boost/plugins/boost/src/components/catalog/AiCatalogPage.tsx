@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Flex,
   Grid,
@@ -38,6 +38,7 @@ import { EmptyFilteredState } from './EmptyFilteredState';
 import { EmptyState } from './EmptyState';
 import { ErrorState } from './ErrorState';
 import { LoadingState } from './LoadingState';
+import { MobileFilterDialog } from './MobileFilterDialog';
 import { ErrorBoundary } from './ErrorBoundary';
 import { FilterSidebar } from './FilterSidebar';
 import styles from './AiCatalogPage.module.css';
@@ -50,7 +51,6 @@ const AiCatalogPageContent = ({ filters }: AiCatalogPageProps) => {
   const { t } = useTranslation();
 
   const filterParams = useMemo(() => filters.map(f => f.urlParam), [filters]);
-  const hasCategoryFilter = filters.some(f => f.urlParam === 'type');
   const urlState = useUrlFilters(filterParams);
   const {
     search,
@@ -61,6 +61,7 @@ const AiCatalogPageContent = ({ filters }: AiCatalogPageProps) => {
     pageSize,
     setSearch,
     setFilter,
+    setFilters,
     setViewMode,
     setPage,
     setPageSize,
@@ -105,7 +106,14 @@ const AiCatalogPageContent = ({ filters }: AiCatalogPageProps) => {
   const hasPreviousPage = page > 0;
   const viewModeKeys = useMemo(() => new Set([viewMode]), [viewMode]);
 
-  if (loading) return <LoadingState />;
+  useEffect(() => {
+    if (!loading && !error && page > 0 && pageStart >= totalCount) {
+      setPage(0, { replace: true });
+    }
+  }, [error, loading, page, pageStart, setPage, totalCount]);
+
+  if (loading)
+    return <LoadingState filterCount={filters.length} cardCount={pageSize} />;
   if (error) return <ErrorState onRetry={retry} />;
 
   const hasActiveFilters = search || filterValues.size > 0;
@@ -121,19 +129,40 @@ const AiCatalogPageContent = ({ filters }: AiCatalogPageProps) => {
         entities={allEntities}
         values={filterValues}
         onFilterChange={setFilter}
+        className={styles.desktopFilters}
       />
       <Flex direction="column" grow={1} className={styles.content}>
-        <Flex align="center" justify="between" gap="4" mb="4">
+        <Flex
+          align="center"
+          justify="between"
+          gap="4"
+          mb="4"
+          style={{ flexWrap: 'wrap' }}
+          className={styles.toolbar}
+        >
           <Text variant="title-small">
             {`${t('catalog.toolbar.allPrefix')} (${totalCount})`}
           </Text>
-          <Flex align="center" gap="3">
+          <Flex
+            align="center"
+            gap="3"
+            className={styles.toolbarActions}
+            style={{ flexWrap: 'wrap' }}
+          >
+            <MobileFilterDialog
+              filters={filters}
+              entities={allEntities}
+              values={filterValues}
+              onApply={setFilters}
+              className={styles.mobileFilters}
+            />
             <SearchField
               aria-label={t('catalog.toolbar.search')}
               placeholder={t('catalog.toolbar.search')}
               value={searchInputValue}
               onChange={setSearch}
               size="small"
+              className={styles.search}
             />
             <ToggleButtonGroup
               selectionMode="single"
@@ -168,14 +197,7 @@ const AiCatalogPageContent = ({ filters }: AiCatalogPageProps) => {
           <Grid.Root columns={{ initial: '1', sm: '2', lg: '4' }} gap="4">
             {pagedEntities.map(entity => (
               <Grid.Item key={entity.metadata.uid ?? entity.metadata.name}>
-                <AiAssetCard
-                  entity={entity}
-                  onCategoryClick={
-                    hasCategoryFilter
-                      ? cat => setFilter('type', [cat])
-                      : undefined
-                  }
-                />
+                <AiAssetCard entity={entity} />
               </Grid.Item>
             ))}
           </Grid.Root>
@@ -208,11 +230,18 @@ const AiCatalogPageContent = ({ filters }: AiCatalogPageProps) => {
 export const AiCatalogPage = ({ filters }: AiCatalogPageProps) => {
   const { t } = useTranslation();
   return (
-    <ErrorBoundary
-      title={t('catalog.error.title')}
-      retryLabel={t('catalog.error.retry')}
-    >
-      <AiCatalogPageContent filters={filters} />
-    </ErrorBoundary>
+    <div className={styles.page} data-testid="ai-catalog-page">
+      <Flex direction="column" px="4" pt="4">
+        <Text variant="body-medium" color="secondary">
+          {t('catalog.page.subtitle')}
+        </Text>
+      </Flex>
+      <ErrorBoundary
+        title={t('catalog.error.title')}
+        retryLabel={t('catalog.error.retry')}
+      >
+        <AiCatalogPageContent filters={filters} />
+      </ErrorBoundary>
+    </div>
   );
 };

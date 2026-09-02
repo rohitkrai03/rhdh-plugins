@@ -21,10 +21,7 @@ import {
   PageBlueprint,
 } from '@backstage/frontend-plugin-api';
 import { TranslationBlueprint } from '@backstage/plugin-app-react';
-import {
-  EntityCardBlueprint,
-  EntityContentBlueprint,
-} from '@backstage/plugin-catalog-react/alpha';
+import { EntityCardBlueprint } from '@backstage/plugin-catalog-react/alpha';
 import { isAiAsset } from '@red-hat-developer-hub/backstage-plugin-boost-common';
 
 import {
@@ -120,6 +117,17 @@ const adoptionCard = EntityCardBlueprint.make({
   },
 });
 
+const assetLocationCard = EntityCardBlueprint.make({
+  name: 'asset-location',
+  params: {
+    filter: isAiAsset,
+    loader: () =>
+      import('./components/catalog/entity/AssetLocationCard').then(m => (
+        <m.AssetLocationCard />
+      )),
+  },
+});
+
 const versionListCard = EntityCardBlueprint.make({
   name: 'version-list',
   params: {
@@ -128,20 +136,6 @@ const versionListCard = EntityCardBlueprint.make({
       import('./components/catalog/entity/VersionListCard').then(m => (
         <m.VersionListCard />
       )),
-  },
-});
-
-// ---------------------------------------------------------------------------
-// Entity Content Blueprint — Usage tab (RBAC-gated) with isAiAsset filter
-// ---------------------------------------------------------------------------
-const usageTab = EntityContentBlueprint.make({
-  name: 'usage',
-  params: {
-    path: '/usage',
-    title: 'Usage',
-    filter: isAiAsset,
-    loader: () =>
-      import('./components/catalog/entity/UsageTab').then(m => <m.UsageTab />),
   },
 });
 
@@ -171,8 +165,8 @@ export const boostPlugin = createFrontendPlugin({
     tagsFilter,
     summaryCard,
     adoptionCard,
+    assetLocationCard,
     versionListCard,
-    usageTab,
   ],
   routes: {
     root: rootRouteRef,

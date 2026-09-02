@@ -71,7 +71,14 @@ describe('AiAssetCard', () => {
     const rendered = await renderInTestApp(
       <AiAssetCard entity={mockSkillEntity} />,
     );
-    expect(rendered.getByText('Skills')).toBeInTheDocument();
+    const badge = rendered.getByText('Skills').closest('.bui-Badge');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveStyle(
+      '--boost-type-accent: var(--boost-color-skill, #4ade80)',
+    );
+    expect(
+      rendered.queryByRole('button', { name: /skills/i }),
+    ).not.toBeInTheDocument();
   });
 
   it('renders tags', async () => {
@@ -86,7 +93,9 @@ describe('AiAssetCard', () => {
     const rendered = await renderInTestApp(
       <AiAssetCard entity={mockSkillEntity} />,
     );
-    expect(rendered.getByText('team-ai-platform')).toBeInTheDocument();
+    expect(
+      rendered.getByRole('link', { name: 'team-ai-platform' }),
+    ).toHaveAttribute('href', '/catalog/default/group/team-ai-platform');
   });
 
   it('renders scope from annotation', async () => {
@@ -101,7 +110,7 @@ describe('AiAssetCard', () => {
       <AiAssetCard entity={mockSkillEntity} />,
     );
     const link = rendered.getByRole('link', {
-      name: /view code review skill details/i,
+      name: /view asset details: code review skill/i,
     });
     expect(link).toHaveAttribute(
       'href',

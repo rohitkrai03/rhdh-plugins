@@ -39,7 +39,7 @@ export const VersionListCard = () => {
         <Flex direction="column" gap="2">
           <Flex align="center" gap="2">
             <Badge size="small">{version}</Badge>
-            <Text variant="body-x-small" color="secondary">
+            <Text variant="body-x-small" color="primary">
               {t('catalog.card.versionCurrent')}
             </Text>
           </Flex>

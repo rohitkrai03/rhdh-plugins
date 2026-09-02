@@ -72,11 +72,13 @@ plugins/boost/
       catalog/                  # AI Catalog domain (RHDHPLAN-1509)
         AiCatalogPage.tsx       # Browse page
         AiAssetCard.tsx         # Card component
-        AiAssetSummaryCard.tsx  # EntityCardBlueprint component
-        DownloadAdoptCard.tsx   # EntityCardBlueprint component
-        VersionListCard.tsx     # EntityCardBlueprint component
-        UsageTab.tsx            # EntityContentBlueprint component
-        filters/                # Search and filter components
+        entity/
+          SummaryCard.tsx       # EntityCardBlueprint component
+          AdoptionCard.tsx      # EntityCardBlueprint component
+          AssetLocationCard.tsx # EntityCardBlueprint component
+          VersionListCard.tsx   # EntityCardBlueprint component
+        MobileFilterDialog.tsx  # Compact draft/apply filter composition
+      filters/                  # Extensible filter definitions
       chat/                     # Chat domain (future)
       admin/                    # Admin domain (future)
     translations/               # i18n resources
@@ -96,14 +98,14 @@ The AI Catalog browse page queries AI assets through the **standard Backstage ca
 flowchart LR
   BrowsePage[AI Catalog Browse Page] -->|"getEntities(filter: kind + type)"| CatalogAPI[catalogApiRef]
   EntityCards[Entity Page Cards] -->|"useEntity()"| CatalogAPI
-  UsageTab[Usage Tab] -->|"useEntity() + permission check"| CatalogAPI
-  DownloadCard[Download Card] -->|"GET /catalog/download (new)"| BoostBackend[boost-backend]
+  AdoptionCard[Adoption Card] -->|"validated direct download/source actions"| GitHosts[Git hosts]
+  TechDocs[Standard TechDocs] -->|"documentation"| CatalogAPI
   GlobalSearch[Search Integration] -->|"search collator"| CatalogAPI
 ```
 
 **Key hook**: `useAiAssets(filters)` wraps `catalogApi.getEntities()` with filters matching the entity model:
 
-- Kind + type combinations: `AiResource` (any type), `API` with `mcp-server`, `Component` with `ai-agent`, `Resource` with `ai-model`/`ai-tool`/`vector-store`
+- Kind + type combinations: `AiResource` with `skill`/`rule`/`agent`/`skill-bundle`, `AiModelServerAPI` with `ai-model-server`, `API` with `mcp-server`, and `Resource` with `ai-model`/`ai-tool`/`vector-store`
 - Annotation filters on `rhdh.io/ai-asset-category`, `rhdh.io/ai-asset-source`
 - Metadata filters on `spec.lifecycle`, `metadata.tags`, `spec.owner`
 
@@ -197,15 +199,17 @@ Backstage v1.51.0 introduced two AI-related additions via `@backstage/plugin-cat
 
 Boost's entity model (Decision 1 in the agent-creation-discovery design) uses upstream kinds where available and existing kinds as fallback:
 
-| Category      | Entity Kind  | `spec.type`    | Notes                                                            |
-| ------------- | ------------ | -------------- | ---------------------------------------------------------------- |
-| Skills        | `AiResource` | `skill`        | Upstream. Has `disciplines`, `categories`, `agents`, `dependsOn` |
-| Rules         | `AiResource` | `rule`         | Upstream. Has `category` (required), `rationale` (required)      |
-| MCP Servers   | `API`        | `mcp-server`   | Upstream. Has `spec.remotes` list                                |
-| Agents        | `Component`  | `ai-agent`     | Boost-defined. No upstream kind yet                              |
-| Models        | `Resource`   | `ai-model`     | Boost-defined. No solid upstream kind yet                        |
-| Tools         | `Resource`   | `ai-tool`      | Boost-defined (Kagenti-specific)                                 |
-| Vector Stores | `Resource`   | `vector-store` | Boost-defined                                                    |
+| Category      | Entity Kind        | `spec.type`       | Notes                                                            |
+| ------------- | ------------------ | ----------------- | ---------------------------------------------------------------- |
+| Skills        | `AiResource`       | `skill`           | Upstream. Has `disciplines`, `categories`, `agents`, `dependsOn` |
+| Rules         | `AiResource`       | `rule`            | Upstream. Has `category` (required), `rationale` (required)      |
+| Agents        | `AiResource`       | `agent`           | AI resource rendered with agent presentation metadata            |
+| Skill Bundles | `AiResource`       | `skill-bundle`    | Collection of related skills                                     |
+| Model Servers | `AiModelServerAPI` | `ai-model-server` | Model-serving API that may group provider-managed models         |
+| MCP Servers   | `API`              | `mcp-server`      | Upstream. Has `spec.remotes` list                                |
+| Models        | `Resource`         | `ai-model`        | Standalone model supplied by any Catalog provider                |
+| Tools         | `Resource`         | `ai-tool`         | Boost-defined (Kagenti-specific)                                 |
+| Vector Stores | `Resource`         | `vector-store`    | Boost-defined                                                    |
 
 Boost-defined entities carry `rhdh.io/ai-asset-category`, `rhdh.io/ai-asset-version`, and `rhdh.io/ai-asset-source` annotations as an interim bridge (RHDHPLAN-1507). Custom `CatalogProcessor` validators support both current and future kinds during upstream transitions.
 
@@ -263,7 +267,7 @@ The AI Catalog is the first domain. Here is how future capabilities map to surfa
 | Frontend system   | NFS Blueprints (`createFrontendPlugin`, `PageBlueprint`, `EntityCardBlueprint`, etc.)                        |
 | State             | React hooks + URL params for filters; streaming reducer for chat events                                      |
 | API               | `catalogApiRef` for entity queries; `BoostApiClient` for `/api/boost` routes; `fetchApi` for auth            |
-| Testing           | Unit: `TestApiProvider` + `renderInTestApp`; E2E: Playwright with multi-locale projects and axe-core         |
+| Testing           | Unit: `TestApiProvider` + `renderInTestApp`; E2E: isolated Playwright viewport/theme workflows and axe-core  |
 | i18n              | `TranslationBlueprint` + `useTranslationRef`; 5 locales planned (de, es, fr, it, ja)                         |
 | Dynamic plugins   | NFS Module Federation via `rhdh-cli plugin export`; no Scalprum (NFS-only plugin)                            |
 | Accessibility     | WCAG 2.1 AA, keyboard navigation, screen reader support                                                      |
@@ -277,4 +281,5 @@ The AI Catalog is the first domain. Here is how future capabilities map to surfa
 - **Sample fixtures as contract**: Dev app uses `catalog-info.yaml` fixtures for all asset types — no dependency on backend entity providers being running
 - **Client-side pagination**: `getEntities` returns full dataset; client-side page slicing is sufficient for the 500-asset target at Dev Preview
 - **Default catalog search**: AI assets appear in RHDH global search via default catalog indexing; custom search collator with category labels is deferred
-- **RBAC graceful degradation**: Permission checks for `ai-catalog.asset.access.usage-docs` default to allow when the permission isn't registered (RHDHPLAN-1508 not yet built); content is shown, and enforcement activates automatically when RBAC lands
+- **Catalog authorization**: Browse results, counts, and filter choices rely on standard Catalog queries and `catalog.entity.read`, including conditional permission decisions; no custom catalog-card permission is used
+- **Documentation composition**: Standard TechDocs is the only documentation tab; the separately scoped docs permission constants and backend enforcement remain unchanged

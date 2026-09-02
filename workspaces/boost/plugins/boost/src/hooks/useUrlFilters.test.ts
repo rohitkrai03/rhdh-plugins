@@ -14,15 +14,33 @@
  * limitations under the License.
  */
 
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { type ReactNode, createElement } from 'react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 
 import { useUrlFilters } from './useUrlFilters';
 
 function wrapper(initialUrl = '/') {
   return ({ children }: { children: ReactNode }) =>
     createElement(MemoryRouter, { initialEntries: [initialUrl] }, children);
+}
+
+function wrapperWithLocation(initialUrl: string) {
+  let currentSearch = '';
+  const LocationProbe = () => {
+    currentSearch = useLocation().search;
+    return null;
+  };
+  return {
+    wrapper: ({ children }: { children: ReactNode }) =>
+      createElement(
+        MemoryRouter,
+        { initialEntries: [initialUrl] },
+        createElement(LocationProbe),
+        children,
+      ),
+    getSearch: () => currentSearch,
+  };
 }
 
 describe('useUrlFilters', () => {
@@ -91,6 +109,30 @@ describe('useUrlFilters', () => {
     expect(result.current.page).toBe(0);
   });
 
+  it('sets all registered filters atomically and clears omitted filters', () => {
+    const { result } = renderHook(
+      () => useUrlFilters(['type', 'owner', 'tag']),
+      { wrapper: wrapper('/?type=skill&owner=team-old&page=3') },
+    );
+
+    act(() =>
+      result.current.setFilters(
+        new Map([
+          ['owner', ['team-ai']],
+          ['tag', ['quality', 'security']],
+        ]),
+      ),
+    );
+
+    expect(result.current.filterValues.has('type')).toBe(false);
+    expect(result.current.filterValues.get('owner')).toEqual(['team-ai']);
+    expect(result.current.filterValues.get('tag')).toEqual([
+      'quality',
+      'security',
+    ]);
+    expect(result.current.page).toBe(0);
+  });
+
   it('clearFilters removes filter params and search but keeps view and pageSize', () => {
     const { result } = renderHook(() => useUrlFilters(['type', 'owner']), {
       wrapper: wrapper(
@@ -131,11 +173,49 @@ describe('useUrlFilters', () => {
     expect(result.current.pageSize).toBe(50);
   });
 
-  it('clamps pageSize between 1 and 100', () => {
-    const { result } = renderHook(() => useUrlFilters([]), {
-      wrapper: wrapper('/?pageSize=999'),
-    });
+  it.each(['999', '25', '-1', 'not-a-number'])(
+    'defaults invalid pageSize %s to 20 and removes it from the URL',
+    async invalidPageSize => {
+      const route = wrapperWithLocation(`/?pageSize=${invalidPageSize}`);
+      const { result } = renderHook(() => useUrlFilters([]), {
+        wrapper: route.wrapper,
+      });
 
-    expect(result.current.pageSize).toBe(100);
+      expect(result.current.pageSize).toBe(20);
+      await waitFor(() => expect(route.getSearch()).toBe(''));
+    },
+  );
+
+  it.each(['cards', 'TABLE', 'unknown'])(
+    'defaults invalid view %s to grid and removes it from the URL',
+    async invalidView => {
+      const route = wrapperWithLocation(`/?view=${invalidView}`);
+      const { result } = renderHook(() => useUrlFilters([]), {
+        wrapper: route.wrapper,
+      });
+
+      expect(result.current.viewMode).toBe('grid');
+      await waitFor(() => expect(route.getSearch()).toBe(''));
+    },
+  );
+
+  it.each(['-1', '1.5', 'bad'])(
+    'defaults invalid page %s to zero and removes it from the URL',
+    async invalidPage => {
+      const route = wrapperWithLocation(`/?page=${invalidPage}`);
+      const { result } = renderHook(() => useUrlFilters([]), {
+        wrapper: route.wrapper,
+      });
+
+      expect(result.current.page).toBe(0);
+      await waitFor(() => expect(route.getSearch()).toBe(''));
+    },
+  );
+
+  it.each([10, 20, 50])('accepts page size %d', pageSize => {
+    const { result } = renderHook(() => useUrlFilters([]), {
+      wrapper: wrapper(`/?pageSize=${pageSize}`),
+    });
+    expect(result.current.pageSize).toBe(pageSize);
   });
 });

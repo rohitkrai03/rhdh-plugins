@@ -4,11 +4,11 @@
 
 Package the AI Catalog frontend plugin for RHDH dynamic plugin deployment and register it in the overlays repo for OCI image builds. Boost is NFS-only (`createFrontendPlugin` as default export) — no Scalprum, no `./alpha`, no legacy entry point.
 
-## Requirements
+## ADDED Requirements
 
 ### Requirement: Plugin Export Configuration
 
-The plugin is configured for `rhdh-cli plugin export`.
+The plugin MUST be configured for `rhdh-cli plugin export`.
 
 #### Scenario: export-dynamic script exists
 
@@ -24,7 +24,7 @@ The plugin is configured for `rhdh-cli plugin export`.
 
 ### Requirement: Default Extension Configuration
 
-A default `app-config.dynamic.yaml` provides sensible extension defaults for deployers.
+A default `app-config.dynamic.yaml` MUST provide sensible extension defaults for deployers.
 
 #### Scenario: Page route configured
 
@@ -34,18 +34,13 @@ A default `app-config.dynamic.yaml` provides sensible extension defaults for dep
 #### Scenario: Entity cards configured
 
 - **GIVEN** the `app-config.dynamic.yaml`
-- **THEN** it lists `entity-card:boost/summary`, `entity-card:boost/adoption`, and `entity-card:boost/version-list` under `app.extensions`
+- **THEN** it lists `entity-card:boost/summary`, `entity-card:boost/adoption`, `entity-card:boost/asset-location`, and `entity-card:boost/version-list` under `app.extensions`
 - **AND** each card has a default entity filter matching AI asset kinds
-
-#### Scenario: Entity tab configured
-
-- **GIVEN** the `app-config.dynamic.yaml`
-- **THEN** it lists `entity-content:boost/usage` under `app.extensions`
-- **AND** the tab has a default title and group assignment
+- **AND** it does not configure the removed `entity-content:boost/usage` extension
 
 ### Requirement: Overlay Registration
 
-The plugin is registered in the overlays repo for automated OCI image builds.
+The plugin MUST be registered in the overlays repo for automated OCI image builds.
 
 #### Scenario: Plugin added to rhdh-plugin-export-overlays
 
@@ -63,7 +58,7 @@ The plugin is registered in the overlays repo for automated OCI image builds.
 
 ### Requirement: Plugin Loads in RHDH
 
-The OCI-packaged plugin loads correctly in an RHDH deployment.
+The OCI-packaged plugin MUST load correctly in an RHDH deployment.
 
 #### Scenario: Plugin loads with Module Federation
 
@@ -77,8 +72,8 @@ The OCI-packaged plugin loads correctly in an RHDH deployment.
 
 - **GIVEN** the boost frontend dynamic plugin is installed
 - **WHEN** a user navigates to a catalog entity page for an AI asset
-- **THEN** the AI Asset Summary Card, Download/Adopt Card, and Version List Card render on the overview
-- **AND** the Usage tab appears in the entity page tabs
+- **THEN** the Summary, Adoption, Asset Location, and current Version cards render when their required entity data exists
+- **AND** standard TechDocs remains the only documentation tab
 
 #### Scenario: Extensions absent on non-AI entities
 
@@ -88,7 +83,7 @@ The OCI-packaged plugin loads correctly in an RHDH deployment.
 
 ### Requirement: Adopter Overrides
 
-Deployers can customize the plugin via `app.extensions` in `app-config.yaml`.
+Deployers MUST be able to customize the plugin via `app.extensions` in `app-config.yaml`.
 
 #### Scenario: Disable an entity card
 
@@ -97,19 +92,11 @@ Deployers can customize the plugin via `app.extensions` in `app-config.yaml`.
 - **THEN** the Download/Adopt Card is not rendered
 - **AND** other boost cards still render
 
-#### Scenario: Rename a tab
-
-- **GIVEN** the deployer sets `entity-content:boost/usage` with `config.title: "How to Use"`
-- **WHEN** a user views an AI asset entity page
-- **THEN** the tab label reads "How to Use" instead of the default
-
 #### Scenario: Change entity filter on a card
 
-- **GIVEN** the deployer sets `entity-card:boost/summary` with `config.filter` restricting to `kind: component`
+- **GIVEN** the deployer sets `entity-card:boost/summary` with a `config.filter` that excludes AI asset kinds
 - **WHEN** a user views an AiResource entity page
 - **THEN** the summary card is not rendered (filter excludes AiResource)
-- **WHEN** a user views a Component/ai-agent entity page
-- **THEN** the summary card renders
 
 #### Scenario: Disable the page
 

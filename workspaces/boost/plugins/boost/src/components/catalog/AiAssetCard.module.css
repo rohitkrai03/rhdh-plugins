@@ -25,8 +25,12 @@
   }
 
   .typeBadge {
-    background-color: transparent;
-    border: 1px solid currentColor;
+    color: var(--bui-fg-primary);
+    border: 1px solid var(--boost-type-accent);
+  }
+
+  .typeIcon {
+    color: var(--boost-type-accent);
   }
 
   .title {
@@ -48,18 +52,21 @@
 
   .footer {
     display: flex;
-    align-items: center;
-    gap: var(--bui-space-2);
-    color: var(--bui-fg-secondary);
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--bui-space-1);
+    color: var(--bui-fg-primary);
+    min-width: 0;
+  }
+
+  .metadataItem {
+    min-width: 0;
+    max-width: 100%;
   }
 
   .ownerIcon {
     display: flex;
     align-items: center;
     flex-shrink: 0;
-  }
-
-  .scope {
-    margin-left: var(--bui-space-2);
   }
 }

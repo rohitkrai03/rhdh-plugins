@@ -29,11 +29,11 @@ This is a new plugin with no existing consumers. The default export from `src/in
 Two surface types:
 
 - `PageBlueprint` at `/ai-catalog` for the card grid browse view. The existing catalog table at `/catalog` does not support card layout, category grouping, or inline adoption actions — a dedicated page is needed.
-- `EntityCardBlueprint` and `EntityContentBlueprint` on existing catalog entity pages for AI-specific cards and tabs. No custom detail page.
+- `EntityCardBlueprint` extensions on existing catalog entity pages for AI-specific cards. Standard Catalog About, Relations, and TechDocs supply the rest of the page; there is no custom detail page or Boost documentation tab.
 
-### Decision 3: catalogApiRef for data, BoostApiClient for download proxy only
+### Decision 3: catalogApiRef for data and direct verified downloads
 
-The browse page queries AI assets through the standard `catalogApiRef` — no custom boost backend routes for browsing. The only custom backend interaction is the download proxy route for git-hosted asset ZIP downloads.
+The browse page queries AI assets through the standard `catalogApiRef`. A verified GitHub repository root links directly to its branch-agnostic zipball URL. Other valid Git sources use View Source unless they already provide an explicit archive. No backend download proxy is introduced.
 
 ### Decision 4: Single isAiAsset filter, components handle kind differences
 
@@ -43,13 +43,13 @@ One `isAiAsset(entity)` condition filter for all entity page Blueprints. The fil
 
 `catalogApi.getEntities()` returns the full matching dataset. Client-side pagination is sufficient for the Dev Preview target of ~500 assets. If catalogs grow beyond this, the hook internals can switch to `queryEntities` (cursor-based) without changing components.
 
-### Decision 6: BUI for UI components, PatternFly chatbot for future chat
+### Decision 6: BUI is authoritative; prototype supplies UX intent
 
-BUI (`@backstage/ui`) is the component library for all new UI. MUI v5 as fallback where BUI lacks coverage. PatternFly AI chatbot (`@patternfly/chatbot`) is reserved for the future chat domain to maintain consistency with Lightspeed.
+BUI (`@backstage/ui` 0.16.0) is authoritative for components, semantics, responsive behavior, and theming. The UX prototype at `https://agentic-524bde.pages.redhat.com/2.1.0/skill-marketplace/skills` informs information hierarchy, content, and interactions only. Its component markup, borders, and pixel styling are not copied over current BUI primitives.
 
-### Decision 7: RBAC graceful degradation
+### Decision 7: Standard Catalog permissions govern browse visibility
 
-Permission checks for `ai-catalog.asset.access.usage-docs` default to allow when the permission is not yet registered (RHDHPLAN-1508 not built). Content is shown, and enforcement activates automatically when RBAC lands.
+The browse query relies on standard Catalog authorization and `catalog.entity.read`, including conditional decisions. Type choices are derived only from the entities returned to the current user. No custom catalog-card permission is introduced. Existing documentation permission constants and backend enforcement remain unchanged for separately scoped work.
 
 ### Decision 8: Extensible browse filters via data-driven FilterDefinition
 
@@ -104,15 +104,17 @@ createFrontendModule({
 
 Backstage v1.51.0 introduced `AiResource` kind and `API` with `spec.type: mcp-server` via `@backstage/plugin-catalog-backend-module-ai-model`. Boost uses upstream kinds where available:
 
-| Category      | Entity Kind | spec.type    | Notes                                                |
-| ------------- | ----------- | ------------ | ---------------------------------------------------- |
-| Skills        | AiResource  | skill        | Upstream. disciplines, categories, agents, dependsOn |
-| Rules         | AiResource  | rule         | Upstream. category (required), rationale (required)  |
-| MCP Servers   | API         | mcp-server   | Upstream. spec.remotes list                          |
-| Agents        | Component   | ai-agent     | Boost-defined                                        |
-| Models        | Resource    | ai-model     | Boost-defined. No solid upstream kind yet            |
-| Tools         | Resource    | ai-tool      | Boost-defined (Kagenti)                              |
-| Vector Stores | Resource    | vector-store | Boost-defined                                        |
+| Category      | Entity Kind      | spec.type       | Notes                                           |
+| ------------- | ---------------- | --------------- | ----------------------------------------------- |
+| Skills        | AiResource       | skill           | Upstream                                        |
+| Rules         | AiResource       | rule            | Upstream                                        |
+| Agents        | AiResource       | agent           | Upstream                                        |
+| Skill Bundles | AiResource       | skill-bundle    | Supported aggregate asset                       |
+| Model Servers | AiModelServerAPI | ai-model-server | Upstream                                        |
+| MCP Servers   | API              | mcp-server      | Upstream                                        |
+| Models        | Resource         | ai-model        | May be supplied independently of a model server |
+| Tools         | Resource         | ai-tool         | Provider-defined                                |
+| Vector Stores | Resource         | vector-store    | Provider-defined                                |
 
 ## Components
 
@@ -120,58 +122,56 @@ Backstage v1.51.0 introduced `AiResource` kind and `API` with `spec.type: mcp-se
 
 Browse page with card grid, search, and filters. PluginHeader provided by the framework.
 
-- Card grid grouped by category with responsive layout
+- Responsive 1/2/4-column card grid with a sticky desktop filter column
+- At 768px and below, a BUI Dialog edits draft filters; Apply commits all URL filters atomically and Cancel discards the draft
 - Debounced keyword search (300ms)
-- Filter controls: category, lifecycle, tags, owner, source connector (AND logic)
+- Filter controls: Type, provider, owner, tags (AND logic, extensible through NFS)
 - Filter/search state in URL query params
-- Pagination, sort (name, last updated)
+- Grid/table views, URL-backed pagination, and table sorting
 - Loading skeletons, empty state with clear-filters, error state with retry
 
 ### AiAssetCard
 
 Card displaying key metadata for one AI asset. Used in the browse grid.
 
-- Name, truncated description, category icon/badge, lifecycle badge
-- Tags, owner, version, source connector indicator
+- Static Type Badge with icon and color accent, name, truncated description, and tags
+- Linked owner and provider attribution
 - Click navigates to catalog entity detail page
 
 ### AiAssetSummaryCard
 
 EntityCardBlueprint on entity overview. Shows AI-specific metadata.
 
-- Category badge, current/recommended version, source attribution, lifecycle
+- Rationale and `models.available` only; standard About owns description and TechDocs owns instructions and operating details
 
 ### DownloadAdoptCard
 
 EntityCardBlueprint on entity overview. Conditional on spec.location.type.
 
-- git: Download button triggers ZIP download via backend proxy
-- oci: docker/podman toggle with copyable pull command
-- Absent: card not rendered
+- skill: copy `npx skills add <name>`
+- OCI: Docker default and Podman alternative, with validated references and no `oci://` in commands
+- verified GitHub repository root: direct Download ZIP
+- other valid Git sources: View Source without branch or archive guessing
+- MCP server: copy a validated HTTP(S) runtime URL
+- Clipboard failure: translated inline danger Alert with Retry
+
+### AssetLocationCard
+
+EntityCardBlueprint showing all unique validated Git sources and OCI artifact references. Runtime MCP endpoints remain in Adoption and TechDocs.
 
 ### VersionListCard
 
-EntityCardBlueprint on entity overview. Shows all versions of the asset.
-
-- Current/recommended highlighted
-- Click navigates to that version's entity page
-
-### UsageTab
-
-EntityContentBlueprint tab. RBAC-gated usage documentation.
-
-- With usage-docs permission: TechDocs content or external links
-- Without permission: "Contact owner for access" affordance
+EntityCardBlueprint on entity overview. Keeps the existing `entity-card:boost/version-list` extension identifier for compatibility, but shows only `rhdh.io/ai-asset-version` as the current version. It does not infer releases, commits, or `spec.versions` history.
 
 ## Design Reference
 
-UX prototype: https://agentic-524bde.pages.redhat.com/skill-marketplace/overview (VPN required)
+UX prototype: https://agentic-524bde.pages.redhat.com/2.1.0/skill-marketplace/skills (VPN required)
 
 ## Acceptance Criteria
 
 ### AiCatalogPage
 
-- Developer sees card grid grouped by category at /ai-catalog
+- Developer sees a responsive BUI card grid at /ai-catalog
 - Search filters cards within 300ms
 - Multiple filters narrow results with AND logic
 - Filter state in URL survives refresh and is shareable
@@ -180,27 +180,25 @@ UX prototype: https://agentic-524bde.pages.redhat.com/skill-marketplace/overview
 
 ### AiAssetCard
 
-- Card displays all metadata fields from entity
+- Card displays Type, name, description, tags, linked owner, and provider
 - Click navigates to catalog entity detail page
 
 ### AiAssetSummaryCard
 
 - Renders on AI asset entity pages only
-- Shows category, version, source, lifecycle
+- Shows rationale and available models only
 
 ### DownloadAdoptCard
 
-- Download button on git assets triggers ZIP download
-- Docker/podman toggle on OCI assets with copyable pull command
-- Not rendered when spec.location.type absent
+- Verified sources download directly; other Git sources fall back to View Source
+- Docker/Podman tabs expose safe copyable OCI commands
+- Clipboard failure can be retried from an inline alert
 
 ### VersionListCard
 
-- Shows all versions; current highlighted
-- Click navigates to version's entity page
+- Shows the current annotated version only
 
-### UsageTab
+### AssetLocationCard
 
-- Renders TechDocs when annotation present; external links as fallback
-- Shows "Contact owner" when user lacks usage-docs permission
-- Tab only appears on AI asset entities
+- Shows validated, deduplicated Git and OCI artifact sources
+- Does not show runtime MCP endpoints

@@ -203,3 +203,56 @@ spec:
     available:
       - granite-3-code
       - granite-3-instruct
+
+---
+# ---------------------------------------------------------------------------
+# Resource / ai-model — standalone models may be supplied by any provider
+# ---------------------------------------------------------------------------
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: granite-code-model
+  title: Granite Code Model
+  description: A standalone catalog model supplied independently of a model-server entity.
+  tags:
+    - model
+    - code-generation
+    - ibm
+  annotations:
+    rhdh.io/ai-asset-version: '3.3.0'
+    rhdh.io/ai-asset-source: model-registry
+spec:
+  type: ai-model
+  lifecycle: production
+  owner: team-ml-ops
+  location:
+    type: git
+    target: https://github.com/example/granite-code-model
+  remotes:
+    - url: oci://quay.io/example/granite-code-model:3.3.0
+      type: oci
+
+---
+# ---------------------------------------------------------------------------
+# AiResource / skill-bundle
+# ---------------------------------------------------------------------------
+apiVersion: backstage.io/v1alpha1
+kind: AiResource
+metadata:
+  name: secure-development-skills
+  title: Secure Development Skills
+  description: A curated bundle of code review and secure development skills.
+  tags:
+    - skills
+    - security
+    - bundle
+  annotations:
+    rhdh.io/ai-asset-version: '1.0.0'
+    rhdh.io/ai-asset-source: github
+spec:
+  type: skill-bundle
+  lifecycle: production
+  owner: team-security
+  location:
+    type: git
+    target: https://github.com/example/secure-development-skills

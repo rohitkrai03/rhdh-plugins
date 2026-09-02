@@ -21,7 +21,7 @@ export const boostMessages = {
     page: {
       title: 'AI Catalog',
       subtitle:
-        'Browse, search, filter, and download AI skills, agents, and rules from your organization',
+        'Browse, search, filter, and adopt AI assets from your organization',
     },
     toolbar: {
       allPrefix: 'All',
@@ -30,6 +30,9 @@ export const boostMessages = {
       viewTable: 'Table view',
     },
     filter: {
+      filters: 'Filters',
+      apply: 'Apply',
+      cancel: 'Cancel',
       type: 'Type',
       provider: 'Provider',
       owner: 'Owner',
@@ -38,16 +41,28 @@ export const boostMessages = {
     card: {
       summaryTitle: 'Summary',
       adoptionTitle: 'Get Started',
-      versionTitle: 'Versions',
+      versionTitle: 'Version',
       versionCurrent: 'current',
+      viewDetails: 'View asset details',
+      tags: 'Tags',
+      owner: 'Owner',
+      provider: 'Provider',
       copyCommand: 'Copy',
       copied: 'Copied',
       copyAriaLabel: 'Copy command to clipboard',
+      copyUrlAriaLabel: 'Copy URL to clipboard',
+      copyFailedTitle: 'Copy failed',
+      copyFailedDescription:
+        'The value could not be copied to the clipboard. Try again.',
+      retryCopy: 'Retry',
+      docker: 'Docker',
+      podman: 'Podman',
       adoptionDownloadZip: 'Download ZIP',
+      adoptionViewSource: 'View Source',
+      assetLocationTitle: 'Asset Location',
+      assetLocationGit: 'Git source',
+      assetLocationOci: 'OCI artifact',
       modelsAvailableTitle: 'Available Models',
-      instructionsTitle: 'Instructions',
-      handoffDescriptionTitle: 'Handoff Description',
-      ragEnabledLabel: 'RAG Enabled',
     },
     table: {
       name: 'Name',
@@ -55,17 +70,6 @@ export const boostMessages = {
       owner: 'Owner',
       provider: 'Provider',
       description: 'Description',
-    },
-    tab: {
-      usageTitle: 'Usage',
-      usageDocumentation: 'Documentation',
-      usageViewTechDocs: 'View TechDocs',
-      usageExternalLinks: 'External Links',
-      usageNoDocumentation:
-        'No usage documentation available. Contact the owner for access.',
-      usagePermissionDenied:
-        'You do not have permission to view usage documentation for this asset.',
-      usageContactOwner: 'Contact owner',
     },
     empty: {
       title: 'No AI assets available',

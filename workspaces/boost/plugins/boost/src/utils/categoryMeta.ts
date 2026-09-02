@@ -17,6 +17,7 @@
 import type { RemixiconComponentType } from '@remixicon/react';
 import {
   RiBrainLine,
+  RiBox3Line,
   RiDatabase2Line,
   RiMagicLine,
   RiRobotLine,
@@ -42,20 +43,30 @@ const categoryMetaMap: Record<string, CategoryMeta> = {
     icon: RiShieldCheckLine,
     color: 'var(--boost-color-rule, #c084fc)',
   },
-  'mcp-server': {
-    label: 'MCP Servers',
-    icon: RiServerLine,
-    color: 'var(--boost-color-mcp-server, #38bdf8)',
-  },
   agent: {
     label: 'Agents',
     icon: RiRobotLine,
     color: 'var(--boost-color-agent, #60a5fa)',
   },
+  'skill-bundle': {
+    label: 'Skill Bundles',
+    icon: RiBox3Line,
+    color: 'var(--boost-color-skill-bundle, #22c55e)',
+  },
   'ai-model-server': {
     label: 'Model Servers',
     icon: RiServerLine,
     color: 'var(--boost-color-model-server, #f472b6)',
+  },
+  'mcp-server': {
+    label: 'MCP Servers',
+    icon: RiServerLine,
+    color: 'var(--boost-color-mcp-server, #38bdf8)',
+  },
+  'ai-model': {
+    label: 'Models',
+    icon: RiBrainLine,
+    color: 'var(--boost-color-model, #a78bfa)',
   },
   'ai-tool': {
     label: 'Tools',

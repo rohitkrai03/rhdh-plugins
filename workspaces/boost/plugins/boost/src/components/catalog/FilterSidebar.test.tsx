@@ -66,7 +66,7 @@ describe('FilterSidebar', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders nav with aria-label', () => {
+  it('renders a complementary filter landmark with aria-label', () => {
     const filters = [mockFilter('type', 'Type')];
 
     render(
@@ -78,9 +78,9 @@ describe('FilterSidebar', () => {
       />,
     );
 
-    expect(screen.getByRole('navigation')).toHaveAttribute(
+    expect(screen.getByRole('complementary')).toHaveAttribute(
       'aria-label',
-      'catalog.page.title',
+      'catalog.filter.filters',
     );
   });
 

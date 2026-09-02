@@ -31,8 +31,10 @@ describe('isAiAsset', () => {
     ['AiResource', 'skill'],
     ['AiResource', 'rule'],
     ['AiResource', 'agent'],
+    ['AiResource', 'skill-bundle'],
     ['AiModelServerAPI', 'ai-model-server'],
     ['API', 'mcp-server'],
+    ['Resource', 'ai-model'],
     ['Resource', 'ai-tool'],
     ['Resource', 'vector-store'],
   ])('returns true for %s with spec.type %s', (kind, type) => {
@@ -75,10 +77,16 @@ describe('buildAiAssetCatalogFilter', () => {
     const filter = buildAiAssetCatalogFilter();
     expect(filter).toEqual(
       expect.arrayContaining([
-        { kind: 'airesource', 'spec.type': ['skill', 'rule', 'agent'] },
+        {
+          kind: 'airesource',
+          'spec.type': ['skill', 'rule', 'agent', 'skill-bundle'],
+        },
         { kind: 'aimodelserverapi', 'spec.type': ['ai-model-server'] },
         { kind: 'api', 'spec.type': ['mcp-server'] },
-        { kind: 'resource', 'spec.type': ['ai-tool', 'vector-store'] },
+        {
+          kind: 'resource',
+          'spec.type': ['ai-model', 'ai-tool', 'vector-store'],
+        },
       ]),
     );
     expect(filter).toHaveLength(4);

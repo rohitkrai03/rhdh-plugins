@@ -45,7 +45,14 @@ export const categoryFilterDefinition: FilterDefinition = {
   urlParam: 'type',
   label: 'Type',
   labelKey: 'catalog.filter.type',
-  getOptions: (_entities: Entity[]) => getAllCategories(),
+  getOptions: (entities: Entity[]) => {
+    const visibleTypes = new Set(
+      entities
+        .map(entity => getSpecField(entity, 'type')?.toLowerCase())
+        .filter((value): value is string => Boolean(value)),
+    );
+    return getAllCategories().filter(category => visibleTypes.has(category.id));
+  },
   matchEntity: (entity: Entity, values: string[]) =>
     matchesCaseInsensitive(getSpecField(entity, 'type'), values),
   priority: 100,

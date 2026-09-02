@@ -2,7 +2,7 @@
 
 ## Why
 
-Developers need a single place to discover AI agents, skills, MCP servers, AI models, and model servers available in their organization. These assets are already registered in the Backstage Software Catalog via ingestion connectors (RHDHPLAN-1507, 1510–1512), but the generic catalog table view is not optimized for marketplace-style discovery — card layout, category grouping, contextual filtering, and download/copy actions are absent.
+Developers need a single place to discover the AI assets available in their organization. These assets may be registered by Boost connectors, manually, or by another Catalog provider, but the generic catalog table view is not optimized for marketplace-style discovery, contextual filtering, and adoption actions.
 
 The existing catalog entity detail pages provide metadata, TechDocs, and relationships out of the box. Rather than rebuilding detail pages, the frontend extends them with AI-specific cards and tabs using NFS Blueprints.
 
@@ -12,20 +12,22 @@ The existing catalog entity detail pages provide metadata, TechDocs, and relatio
 
 A standalone page at `/ai-catalog` with a card grid for discovering AI assets:
 
-- Cards grouped by category (skills, rules, MCP servers, agents, models)
+- Responsive BUI card grid with Type, name, description, tags, owner, and provider
 - Search bar with debounced keyword filtering
-- Multi-faceted filter controls (category, lifecycle, tags, owner, source connector)
-- Pagination, sort, loading/empty/error states
+- Extensible Type, provider, owner, and tag filters, with an atomic compact-screen dialog
+- Grid/table switching, pagination, sorting, and loading/empty/error states
 - Card click navigates to the existing catalog entity detail page
 
 ### Entity Page Extensions
 
 NFS Blueprint extensions that render on catalog entity pages for AI assets:
 
-- AI Asset Summary Card — category, version, source, lifecycle
-- Download/Adopt Card — ZIP download for git assets, docker/podman pull command for OCI assets
-- Version List Card — all versions with navigation
-- Usage Tab — RBAC-gated usage documentation (TechDocs or external links)
+- Summary Card — rationale and available models not already owned by Catalog About or TechDocs
+- Adoption Card — safe copy commands/URLs, verified downloads, and source fallbacks
+- Asset Location Card — validated Git and OCI artifact sources
+- Version Card — the current annotated version only
+
+Standard Catalog About, Relations, and TechDocs remain the entity-page composition. Boost does not add a second documentation tab.
 
 ### Dev App Shell
 
@@ -36,4 +38,5 @@ NFS Blueprint extensions that render on catalog entity pages for AI assets:
 - `plugins/boost/` — new NFS frontend plugin
 - `packages/app/` — new dev app shell
 - `packages/backend/` — new dev backend
-- `boost-backend` — new download proxy route (`GET /api/boost/catalog/download`)
+
+Git downloads are direct frontend links for verified sources; this change does not add a backend download proxy or a new catalog-card permission.

@@ -36,8 +36,8 @@ export function entityHref(entity: Entity): string {
  * kind `group` in the `default` namespace, matching common Backstage
  * conventions for `spec.owner`.
  *
- * Returns `undefined` when `ref` is not a valid entity ref, so callers
- * (the Usage tab denied fallback) can omit the link instead of throwing.
+ * Returns `undefined` when `ref` is not a valid entity ref, so callers can
+ * render a non-link fallback instead of throwing.
  */
 export function entityRefHref(ref: string): string | undefined {
   try {
@@ -95,40 +95,50 @@ export function applyEntityFilters(
 }
 
 /**
- * Resolved adoption action for an AI asset entity.
- *
- * - `copy`: the value should be copied to the clipboard (skill, OCI pull, MCP remote URL).
- * - `link`: the value is a URL that should be opened in a new tab (git ZIP download).
+ * A command that can be copied from the Adoption card.
  */
-export interface AdoptionAction {
-  type: 'copy' | 'link';
+export interface AdoptionCommand {
+  runtime?: 'docker' | 'podman';
   value: string;
 }
 
 /**
+ * Resolved adoption action for an AI asset entity.
+ */
+export type AdoptionAction =
+  | { type: 'copy-command'; commands: AdoptionCommand[] }
+  | { type: 'verified-download'; href: string }
+  | { type: 'view-source'; href: string }
+  | { type: 'copy-url'; value: string };
+
+export type AssetLocation =
+  | { type: 'git'; value: string; href: string }
+  | { type: 'oci'; value: string };
+
+/**
  * Parses a URL string and returns its hostname, or undefined if the URL is malformed.
  */
-function parseHostname(url: string): string | undefined {
+function parseHttpUrl(url: string): URL | undefined {
   try {
-    return new URL(url).hostname;
+    const parsed = new URL(url);
+    return ['http:', 'https:'].includes(parsed.protocol) ? parsed : undefined;
   } catch {
     return undefined;
   }
 }
 
-function isHost(hostname: string | undefined, host: string): boolean {
-  return hostname === host || (hostname?.endsWith(`.${host}`) ?? false);
+function isHost(url: URL | undefined, host: string): boolean {
+  return url?.hostname === host || url?.hostname === `www.${host}`;
 }
 
 /**
  * Matches a well-formed `oci://` reference and rejects anything containing
  * shell metacharacters (`;`, `|`, `` ` ``, `$()`, spaces, etc.), since this
- * value is interpolated into a `podman pull` command that gets copied to the
- * clipboard.
+ * value is interpolated into container pull commands copied to the clipboard.
  */
 const OCI_REFERENCE_PATTERN = /^oci:\/\/[a-zA-Z0-9][a-zA-Z0-9._:@/-]*$/;
 
-function isSafeOciReference(url: string): boolean {
+export function isSafeOciReference(url: string): boolean {
   return OCI_REFERENCE_PATTERN.test(url);
 }
 
@@ -136,46 +146,36 @@ function isSafeOciReference(url: string): boolean {
  * Returns true if `value` parses as an absolute `http:`/`https:` URL.
  */
 function isHttpUrl(value: string): boolean {
-  try {
-    return ['http:', 'https:'].includes(new URL(value).protocol);
-  } catch {
-    return false;
-  }
+  return parseHttpUrl(value) !== undefined;
 }
 
-/**
- * Builds a "download ZIP" archive URL for a git-hosted repository target.
- *
- * - GitHub: uses the branch-agnostic `zipball` API endpoint, so the actual
- *   default branch is always resolved server-side (no branch guessing).
- *   Requires the target path to be exactly `owner/repo` (a repo root); a
- *   subpage such as `/tree/main` or `/blob/...` is not a repo root and is
- *   returned unchanged rather than guessing a wrong owner/repo pair.
- * - GitLab: has no branch-agnostic web URL, so this falls back to a
- *   best-effort `main` branch guess. This is a heuristic pending the
- *   backend download proxy (RHIDP-15167); it may not resolve for
- *   repositories whose default branch isn't `main`.
- */
-function buildGitArchiveUrl(target: string, hostname: string): string {
-  let segments: string[];
-  try {
-    segments = new URL(target).pathname
-      .replace(/^\/|\/$/g, '')
-      .split('/')
-      .filter(Boolean);
-  } catch {
-    return target;
-  }
+function githubArchiveUrl(url: URL): string | undefined {
+  if (!isHost(url, 'github.com') || url.search || url.hash) return undefined;
+  const segments = url.pathname
+    .replace(/^\/|\/$/g, '')
+    .split('/')
+    .filter(Boolean);
+  if (segments.length !== 2) return undefined;
+  const [owner, repoWithSuffix] = segments;
+  const repo = repoWithSuffix.replace(/\.git$/, '');
+  const safeSegment = /^[a-zA-Z0-9_.-]+$/;
+  if (!safeSegment.test(owner) || !safeSegment.test(repo)) return undefined;
+  return `https://api.github.com/repos/${owner}/${repo}/zipball`;
+}
 
-  if (isHost(hostname, 'github.com')) {
-    if (segments.length !== 2) return target;
-    const [owner, repoRaw] = segments;
-    return `https://api.github.com/repos/${owner}/${repoRaw.replace(/\.git$/, '')}/zipball`;
-  }
+function isExplicitGitLabArchive(url: URL): boolean {
+  return (
+    isHost(url, 'gitlab.com') &&
+    url.pathname.includes('/-/archive/') &&
+    url.pathname.endsWith('.zip')
+  );
+}
 
-  const repo = segments[segments.length - 1]?.replace(/\.git$/, '');
-  if (!repo) return target;
-  return `${target.replace(/\/$/, '')}/-/archive/main/${repo}-main.zip`;
+function normalizeSourceLocation(
+  value: string | undefined,
+): string | undefined {
+  if (!value) return undefined;
+  return value.startsWith('url:') ? value.slice(4) : value;
 }
 
 /**
@@ -183,8 +183,8 @@ function buildGitArchiveUrl(target: string, hostname: string): string {
  *
  * Priority order:
  * 1. Skills — `npx skills add <name>`
- * 2. OCI-sourced — `podman pull <oci-ref>`
- * 3. Git-sourced — Download ZIP link
+ * 2. OCI-sourced — Docker and Podman pull commands
+ * 3. Git-sourced — verified download or source link
  * 4. MCP servers — remote URL copy
  * 5. Fallback — undefined (no action)
  */
@@ -195,8 +195,8 @@ export function getAdoptionAction(entity: Entity): AdoptionAction | undefined {
   // 1. Skills
   if (specType === 'skill') {
     return {
-      type: 'copy',
-      value: `npx skills add ${entity.metadata.name}`,
+      type: 'copy-command',
+      commands: [{ value: `npx skills add ${entity.metadata.name}` }],
     };
   }
 
@@ -210,9 +210,13 @@ export function getAdoptionAction(entity: Entity): AdoptionAction | undefined {
   // an oci:// remote takes precedence even for entities typed `mcp-server`.
   const ociRemote = remotes.find(r => r.url && isSafeOciReference(r.url));
   if (ociRemote?.url) {
+    const reference = ociRemote.url.slice('oci://'.length);
     return {
-      type: 'copy',
-      value: `podman pull ${ociRemote.url}`,
+      type: 'copy-command',
+      commands: [
+        { runtime: 'docker', value: `docker pull ${reference}` },
+        { runtime: 'podman', value: `podman pull ${reference}` },
+      ],
     };
   }
 
@@ -222,11 +226,18 @@ export function getAdoptionAction(entity: Entity): AdoptionAction | undefined {
     | undefined;
   if (location?.type === 'git' && location.target) {
     const target = location.target;
-    const hostname = parseHostname(target);
-    if (isHost(hostname, 'github.com') || isHost(hostname, 'gitlab.com')) {
+    const parsed = parseHttpUrl(target);
+    if (parsed) {
+      const archiveHref = githubArchiveUrl(parsed);
+      if (archiveHref || isExplicitGitLabArchive(parsed)) {
+        return {
+          type: 'verified-download',
+          href: archiveHref ?? target,
+        };
+      }
       return {
-        type: 'link',
-        value: buildGitArchiveUrl(target, hostname as string),
+        type: 'view-source',
+        href: target,
       };
     }
   }
@@ -239,7 +250,7 @@ export function getAdoptionAction(entity: Entity): AdoptionAction | undefined {
       ) ?? remotes.find(r => r.url && isHttpUrl(r.url));
     if (mcpRemote?.url) {
       return {
-        type: 'copy',
+        type: 'copy-url',
         value: mcpRemote.url,
       };
     }
@@ -247,6 +258,43 @@ export function getAdoptionAction(entity: Entity): AdoptionAction | undefined {
 
   // 5. Fallback
   return undefined;
+}
+
+/**
+ * Returns every validated source location suitable for display on the entity
+ * page. Runtime endpoints are deliberately excluded.
+ */
+export function getAssetLocations(entity: Entity): AssetLocation[] {
+  const spec = entity.spec as Record<string, unknown> | undefined;
+  const locations: AssetLocation[] = [];
+  const seen = new Set<string>();
+
+  const addGit = (value: string | undefined) => {
+    const normalized = normalizeSourceLocation(value);
+    if (!normalized || !isHttpUrl(normalized)) return;
+    const key = `git:${normalized}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    locations.push({ type: 'git', value: normalized, href: normalized });
+  };
+
+  const location = spec?.location as
+    | { type?: string; target?: string }
+    | undefined;
+  if (location?.type?.toLowerCase() === 'git') addGit(location.target);
+  addGit(entity.metadata.annotations?.['backstage.io/source-location']);
+
+  const remotes = (spec?.remotes ?? []) as Array<{ url?: string }>;
+  for (const remote of remotes) {
+    if (!remote.url || !isSafeOciReference(remote.url)) continue;
+    const value = remote.url.slice('oci://'.length);
+    const key = `oci:${value}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    locations.push({ type: 'oci', value });
+  }
+
+  return locations;
 }
 
 export function getSortValue(entity: Entity, columnId: string): string {

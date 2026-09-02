@@ -1,131 +1,65 @@
 # E2E Tests
 
-> **Status: Draft** — Pre-implementation specification. Subject to change during implementation.
+> **Status: Implemented** — NFS-only Playwright and axe release proof.
 
-Playwright end-to-end tests for the AI Catalog frontend plugin. Boost is NFS-only (no legacy app), so no `APP_MODE` dual testing. Tests use translation keys instead of hardcoded strings and include axe-core accessibility audits.
-
-## Requirements
+## ADDED Requirements
 
 ### Requirement: Playwright Infrastructure
 
-The workspace has a working Playwright setup following rhdh-plugins conventions.
+The workspace MUST provide an isolated Playwright runner for the NFS development app.
 
-#### Scenario: Playwright config exists
+#### Scenario: Release suite runs
 
-- **GIVEN** the boost workspace
-- **WHEN** a developer runs `yarn test:e2e`
-- **THEN** Playwright starts the dev app via `yarn start`, waits for readiness, and runs tests from `e2e-tests/`
+- **WHEN** a developer runs `yarn test:e2e` in the Boost workspace
+- **THEN** Playwright starts the NFS dev app, runs `e2e-tests/`, and writes an HTML report
+- **AND** failure screenshots and first-retry traces are retained
 
-#### Scenario: Multi-locale test projects
+### Requirement: Browse Workflows
 
-- **GIVEN** the Playwright config defines projects for at least `en` and one non-English locale (e.g., `ja`)
-- **WHEN** the full e2e suite runs
-- **THEN** tests execute against both locales
-- **AND** per-locale `app-config-e2e-*.yaml` overrides configure separate ports so projects can run in parallel
+The release suite MUST cover the primary browse, filter, view, sort, pagination, and navigation workflows.
 
-#### Scenario: CI integration
+#### Scenario: Core discovery flow
 
-- **GIVEN** CI runs `yarn playwright test` in the boost workspace
-- **WHEN** the test suite completes
-- **THEN** test reports are generated in `e2e-test-report/`
-- **AND** test artifacts (screenshots, traces on failure) are stored in `e2e-test-results/`
+- **WHEN** a developer searches, selects filters, switches card/table views, sorts, or navigates to an entity
+- **THEN** results and URL state update consistently
+- **AND** table columns use Name, Type, Provider, Owner, Description order
 
-### Requirement: Browse Page Tests
+#### Scenario: Compact filter flow
 
-The AI Catalog browse page is tested end-to-end.
+- **WHEN** a developer uses the filter dialog at 768px or below
+- **THEN** Cancel discards draft state and restores trigger focus
+- **AND** Apply commits all selections atomically
+- **AND** keyboard activation works
 
-#### Scenario: Card grid renders with fixture data
+#### Scenario: Pagination and malformed state
 
-- **WHEN** the e2e test navigates to `/ai-catalog`
-- **THEN** AI asset cards are visible on the page
-- **AND** cards display translated text (using translation keys, not hardcoded English)
+- **GIVEN** more than one page of visible entities
+- **WHEN** the developer moves between pages
+- **THEN** the correct result slice and URL page render
+- **WHEN** the requested page is out of range
+- **THEN** the first page renders and the URL is repaired
 
-#### Scenario: Search filters cards
+### Requirement: State Coverage
 
-- **GIVEN** the browse page has loaded with AI assets
-- **WHEN** the test types a keyword in the search bar
-- **THEN** the visible cards are filtered to match the keyword
-- **AND** the URL updates with `?q=<keyword>`
+The release suite MUST exercise loading, empty, failure, and retry behavior.
 
-#### Scenario: Sidebar filters narrow results
+#### Scenario: Loading, empty, and error states
 
-- **GIVEN** the browse page has loaded
-- **WHEN** the test selects a category filter (e.g., "skill")
-- **THEN** only cards matching that category are shown
-- **AND** the URL updates with the filter param
+- **WHEN** Catalog is pending, returns no entities, or fails
+- **THEN** the corresponding BUI state renders
+- **AND** Retry can recover from failure
 
-#### Scenario: Multiple filters combine as AND
+### Requirement: Responsive and Accessible Release Proof
 
-- **GIVEN** the browse page has loaded
-- **WHEN** the test selects category "skill" AND a specific tag
-- **THEN** only cards matching both criteria are shown
+The release suite MUST verify responsive reflow, supported themes, keyboard behavior, and automated accessibility.
 
-#### Scenario: Clear filters resets the view
+#### Scenario: Supported widths and zoom
 
-- **GIVEN** filters are active and the card grid is narrowed
-- **WHEN** the test clicks the clear-filters action
-- **THEN** all filter URL params are removed
-- **AND** the full card grid is restored
+- **WHEN** the catalog is rendered at 1440px, 1024px, 768px, and a mobile viewport at 200% zoom
+- **THEN** no page-level horizontal overflow occurs
 
-#### Scenario: Card click navigates to entity detail
+#### Scenario: Theme and automated accessibility coverage
 
-- **GIVEN** AI asset cards are visible
-- **WHEN** the test clicks on a card
-- **THEN** the browser navigates to the catalog entity detail page for that asset
-
-### Requirement: State and Error Handling Tests
-
-Edge cases are covered by e2e tests.
-
-#### Scenario: Empty state when no assets match
-
-- **GIVEN** the browse page has loaded
-- **WHEN** the test applies filters that match no assets
-- **THEN** the empty state message is displayed (verified via translation key)
-- **AND** the clear-filters action is visible
-
-#### Scenario: Pagination controls work
-
-- **GIVEN** the catalog has more assets than one page
-- **WHEN** the test clicks the next-page control
-- **THEN** the card grid updates to show the next page of results
-- **AND** the URL updates with the page param
-
-#### Scenario: Sort control changes order
-
-- **GIVEN** the browse page has loaded
-- **WHEN** the test changes the sort to "last updated"
-- **THEN** the card order updates accordingly
-
-### Requirement: Accessibility Audits
-
-Every tested page passes automated accessibility checks.
-
-#### Scenario: Browse page passes axe audit
-
-- **WHEN** the browse page has loaded
-- **THEN** an axe-core scan with WCAG 2.1 AA rules reports zero violations
-- **AND** violations (if any) are attached to the test report for debugging
-
-#### Scenario: Filtered state passes axe audit
-
-- **GIVEN** filters are active on the browse page
-- **WHEN** an axe-core scan runs
-- **THEN** zero WCAG 2.1 AA violations are reported (focus management, aria-labels intact)
-
-### Requirement: Translation Key Usage
-
-Tests do not hardcode English strings.
-
-#### Scenario: UI text verified via translation keys
-
-- **GIVEN** the test needs to verify a UI label
-- **WHEN** it locates the element
-- **THEN** it uses the translated string from the plugin's translation module for the current locale
-- **AND** the same test code works for `en`, `de`, `es`, `fr`, `it`, `ja` without modification
-
-#### Scenario: Translation helper utility exists
-
-- **GIVEN** a `getTranslations(locale)` utility exists in `e2e-tests/utils/`
-- **WHEN** a test calls it
-- **THEN** it returns the message map for that locale loaded from the plugin's translation modules
+- **WHEN** the catalog renders under light, dark, and forced/high-contrast media settings
+- **THEN** the UI retains semantic labels and keyboard access
+- **AND** axe WCAG 2.1 AA scans report no violations or attach findings to the test report

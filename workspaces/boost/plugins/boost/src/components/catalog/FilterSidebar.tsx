@@ -24,11 +24,15 @@ import styles from './FilterSidebar.module.css';
 
 type TranslationKey = Parameters<ReturnType<typeof useTranslation>['t']>[0];
 
-interface FilterSidebarProps {
+interface FilterControlsProps {
   filters: FilterDefinition[];
   entities: Entity[];
   values: Map<string, string[]>;
   onFilterChange: (urlParam: string, values: string[]) => void;
+}
+
+interface FilterSidebarProps extends FilterControlsProps {
+  className?: string;
 }
 
 function FilterSelect({
@@ -62,18 +66,16 @@ function FilterSelect({
   );
 }
 
-export const FilterSidebar = ({
+export const FilterControls = ({
   filters,
   entities,
   values,
   onFilterChange,
-}: FilterSidebarProps) => {
-  const { t } = useTranslation();
-
+}: FilterControlsProps) => {
   if (filters.length === 0) return null;
 
   return (
-    <nav className={styles.sidebar} aria-label={t('catalog.page.title')}>
+    <>
       {filters.map(filter => (
         <FilterSelect
           key={filter.urlParam}
@@ -83,6 +85,32 @@ export const FilterSidebar = ({
           onChange={vals => onFilterChange(filter.urlParam, vals)}
         />
       ))}
-    </nav>
+    </>
+  );
+};
+
+export const FilterSidebar = ({
+  filters,
+  entities,
+  values,
+  onFilterChange,
+  className,
+}: FilterSidebarProps) => {
+  const { t } = useTranslation();
+
+  if (filters.length === 0) return null;
+
+  return (
+    <aside
+      className={`${styles.sidebar} ${className ?? ''}`}
+      aria-label={t('catalog.filter.filters')}
+    >
+      <FilterControls
+        filters={filters}
+        entities={entities}
+        values={values}
+        onFilterChange={onFilterChange}
+      />
+    </aside>
   );
 };

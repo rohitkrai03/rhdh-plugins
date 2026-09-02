@@ -31,8 +31,9 @@ export interface UrlFilterState {
 export interface UrlFilterActions {
   setSearch: (value: string) => void;
   setFilter: (urlParam: string, values: string[]) => void;
+  setFilters: (values: Map<string, string[]>) => void;
   setViewMode: (mode: ViewMode) => void;
-  setPage: (page: number) => void;
+  setPage: (page: number, options?: { replace?: boolean }) => void;
   setPageSize: (size: number) => void;
   clearFilters: () => void;
 }
@@ -43,6 +44,14 @@ function readArray(params: URLSearchParams, key: string): string[] {
 }
 
 const SEARCH_DEBOUNCE_MS = 300;
+const DEFAULT_PAGE_SIZE = 20;
+const ALLOWED_PAGE_SIZES = new Set([10, 20, 50]);
+
+function parseNonNegativeInteger(value: string | null): number | undefined {
+  if (value === null || !/^\d+$/.test(value)) return undefined;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : undefined;
+}
 
 /**
  * Synchronizes filter, search, pagination, and view mode state
@@ -55,12 +64,38 @@ export function useUrlFilters(
   const [searchParams, setSearchParams] = useSearchParams();
 
   const rawSearch = searchParams.get('q') ?? '';
-  const viewMode = (searchParams.get('view') as ViewMode) || 'grid';
-  const page = Math.max(0, parseInt(searchParams.get('page') ?? '0', 10) || 0);
-  const pageSize = Math.min(
-    100,
-    Math.max(1, parseInt(searchParams.get('pageSize') ?? '20', 10) || 20),
-  );
+  const rawView = searchParams.get('view');
+  const viewMode: ViewMode = rawView === 'table' ? 'table' : 'grid';
+  const rawPage = searchParams.get('page');
+  const parsedPage = parseNonNegativeInteger(rawPage);
+  const page = parsedPage ?? 0;
+  const rawPageSize = searchParams.get('pageSize');
+  const parsedPageSize = parseNonNegativeInteger(rawPageSize);
+  const pageSize =
+    parsedPageSize !== undefined && ALLOWED_PAGE_SIZES.has(parsedPageSize)
+      ? parsedPageSize
+      : DEFAULT_PAGE_SIZE;
+
+  const invalidView =
+    rawView !== null && rawView !== 'grid' && rawView !== 'table';
+  const invalidPage = rawPage !== null && parsedPage === undefined;
+  const invalidPageSize =
+    rawPageSize !== null &&
+    (parsedPageSize === undefined || !ALLOWED_PAGE_SIZES.has(parsedPageSize));
+
+  useEffect(() => {
+    if (!invalidView && !invalidPage && !invalidPageSize) return;
+    setSearchParams(
+      prev => {
+        const next = new URLSearchParams(prev);
+        if (invalidView) next.delete('view');
+        if (invalidPage) next.delete('page');
+        if (invalidPageSize) next.delete('pageSize');
+        return next;
+      },
+      { replace: true },
+    );
+  }, [invalidPage, invalidPageSize, invalidView, setSearchParams]);
 
   // Derived key that changes only when filter-relevant URL params change,
   // not on pagination or view mode changes.
@@ -134,6 +169,25 @@ export function useUrlFilters(
     [setSearchParams],
   );
 
+  const setFilters = useCallback(
+    (values: Map<string, string[]>) => {
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        for (const param of filterParams) {
+          const selected = values.get(param) ?? [];
+          if (selected.length > 0) {
+            next.set(param, selected.join(','));
+          } else {
+            next.delete(param);
+          }
+        }
+        next.delete('page');
+        return next;
+      });
+    },
+    [filterParams, setSearchParams],
+  );
+
   const setViewMode = useCallback(
     (mode: ViewMode) => {
       setSearchParams(prev => {
@@ -150,16 +204,19 @@ export function useUrlFilters(
   );
 
   const setPage = useCallback(
-    (p: number) => {
-      setSearchParams(prev => {
-        const next = new URLSearchParams(prev);
-        if (p === 0) {
-          next.delete('page');
-        } else {
-          next.set('page', String(p));
-        }
-        return next;
-      });
+    (p: number, options?: { replace?: boolean }) => {
+      setSearchParams(
+        prev => {
+          const next = new URLSearchParams(prev);
+          if (p <= 0) {
+            next.delete('page');
+          } else {
+            next.set('page', String(p));
+          }
+          return next;
+        },
+        { replace: options?.replace },
+      );
     },
     [setSearchParams],
   );
@@ -199,6 +256,7 @@ export function useUrlFilters(
     pageSize,
     setSearch,
     setFilter,
+    setFilters,
     setViewMode,
     setPage,
     setPageSize,

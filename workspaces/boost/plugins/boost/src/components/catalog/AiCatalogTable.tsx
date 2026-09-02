@@ -26,27 +26,36 @@ import {
 
 import { useTranslation } from '../../hooks/useTranslation';
 import { getCategoryMeta } from '../../utils/categoryMeta';
-import { entityHref, getSpecField } from '../../utils/entityHelpers';
+import {
+  entityHref,
+  entityRefHref,
+  getSpecField,
+} from '../../utils/entityHelpers';
 
 interface AiAssetRow extends TableItem {
   title: string;
   categoryLabel: string;
   owner: string;
+  ownerHref?: string;
   provider: string;
   description: string;
   href: string;
 }
 
 function toRows(entities: Entity[]): AiAssetRow[] {
-  return entities.map(entity => ({
-    id: entity.metadata.uid ?? entity.metadata.name,
-    title: entity.metadata.title ?? entity.metadata.name,
-    categoryLabel: getCategoryMeta(getSpecField(entity, 'type')).label,
-    owner: getSpecField(entity, 'owner') ?? '',
-    provider: entity.metadata.annotations?.['rhdh.io/ai-asset-source'] ?? '',
-    description: entity.metadata.description ?? '',
-    href: entityHref(entity),
-  }));
+  return entities.map(entity => {
+    const owner = getSpecField(entity, 'owner') ?? '';
+    return {
+      id: entity.metadata.uid ?? entity.metadata.name,
+      title: entity.metadata.title ?? entity.metadata.name,
+      categoryLabel: getCategoryMeta(getSpecField(entity, 'type')).label,
+      owner,
+      ownerHref: owner ? entityRefHref(owner) : undefined,
+      provider: entity.metadata.annotations?.['rhdh.io/ai-asset-source'] ?? '',
+      description: entity.metadata.description ?? '',
+      href: entityHref(entity),
+    };
+  });
 }
 
 export interface AiCatalogTableProps {
@@ -74,15 +83,15 @@ export const AiCatalogTable = ({ entities, sort }: AiCatalogTableProps) => {
         isSortable: true,
       },
       {
-        id: 'owner',
-        label: t('catalog.table.owner'),
-        cell: item => <CellText title={item.owner} />,
-        isSortable: true,
-      },
-      {
         id: 'provider',
         label: t('catalog.table.provider'),
         cell: item => <CellText title={item.provider} />,
+        isSortable: true,
+      },
+      {
+        id: 'owner',
+        label: t('catalog.table.owner'),
+        cell: item => <CellText title={item.owner} href={item.ownerHref} />,
         isSortable: true,
       },
       {

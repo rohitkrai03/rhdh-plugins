@@ -10,11 +10,11 @@ Filters are **data, not components**. Each filter is a `FilterDefinition` — a 
 
 The NFS extension system handles enable/disable/add via `app.extensions`. The `AiCatalogFilterBlueprint` wraps a `FilterDefinition` in an extension. A single custom `createExtensionDataRef` carries the whole definition object. No `config` schema — deployers control filter visibility via NFS disable (`ai-catalog-filter:boost/owner: false`) and filter render order via `priority` in params.
 
-## Requirements
+## ADDED Requirements
 
 ### Requirement: FilterDefinition and AiCatalogFilterBlueprint
 
-A `FilterDefinition` interface defines the contract. A Blueprint wraps it as an NFS extension.
+A `FilterDefinition` interface MUST define the contract, and a Blueprint MUST wrap it as an NFS extension.
 
 #### Scenario: FilterDefinition provides required fields
 
@@ -42,13 +42,14 @@ A `FilterDefinition` interface defines the contract. A Blueprint wraps it as an 
 
 ### Requirement: Built-in Filters as Extensions
 
-Existing hardcoded filters are converted to `FilterDefinition` objects registered as default Blueprint extensions.
+Existing hardcoded filters MUST be represented as `FilterDefinition` objects registered as default Blueprint extensions.
 
 #### Scenario: Default filter set matches current behavior
 
 - **WHEN** no app-config overrides are present
 - **THEN** the browse page renders the same four filters as before: category (type), provider, owner, tags
 - **AND** filter behavior (AND logic, URL params, dynamic options) is unchanged
+- **AND** Type options are restricted to types present in Catalog entities visible to the current user, while preserving canonical taxonomy order
 
 #### Scenario: Built-in filters are plain objects
 
@@ -59,7 +60,7 @@ Existing hardcoded filters are converted to `FilterDefinition` objects registere
 
 ### Requirement: Disable Filters via app-config
 
-Deployers can disable any built-in filter using NFS extension disable.
+Deployers MUST be able to disable any built-in filter using NFS extension disable.
 
 #### Scenario: Disable a single filter
 
@@ -86,7 +87,7 @@ Deployers can disable any built-in filter using NFS extension disable.
 
 ### Requirement: Add Custom Filters via NFS Module
 
-Third-party plugins can contribute new filters by providing a `FilterDefinition`.
+Third-party plugins MUST be able to contribute new filters by providing a `FilterDefinition`.
 
 #### Scenario: Third-party filter appears in sidebar
 
@@ -120,7 +121,7 @@ Third-party plugins can contribute new filters by providing a `FilterDefinition`
 
 ### Requirement: Dynamic Filter Architecture
 
-The filter pipeline adapts to the registered filter set.
+The filter pipeline MUST adapt to the registered filter set.
 
 #### Scenario: useUrlFilters reads registered filters dynamically
 
@@ -145,6 +146,15 @@ The filter pipeline adapts to the registered filter set.
 - **AND** view mode (`view`) and page size (`pageSize`) are preserved
 - **AND** the full unfiltered card grid is restored
 
+#### Scenario: Compact Apply updates registered filters atomically
+
+- **GIVEN** the compact BUI Dialog has draft selections for multiple registered filters
+- **WHEN** the developer selects Apply
+- **THEN** one URL update writes every registered filter selection
+- **AND** omitted filters are cleared and page is reset
+- **WHEN** the developer cancels
+- **THEN** no filter URL state changes
+
 #### Scenario: Active filter detection includes custom filters
 
 - **WHEN** only a custom filter has a selection (no built-in filters active)
@@ -153,7 +163,7 @@ The filter pipeline adapts to the registered filter set.
 
 ### Requirement: Page Extension Input
 
-The AI Catalog page declares a filters input for child extensions.
+The AI Catalog page MUST declare a filters input for child extensions.
 
 #### Scenario: Page collects filter extensions
 
@@ -170,3 +180,18 @@ The AI Catalog page declares a filters input for child extensions.
 - **THEN** the page renders without a filter sidebar
 - **AND** search still works
 - **AND** the page does not crash
+
+### Requirement: Responsive Filter Composition
+
+The same registered filter definitions MUST drive both desktop and compact filter compositions.
+
+#### Scenario: Desktop composition
+
+- **WHEN** the viewport is wider than 768px
+- **THEN** the generic filter controls render in a sticky complementary sidebar
+
+#### Scenario: Compact composition
+
+- **WHEN** the viewport is 768px or narrower
+- **THEN** the same generic filter controls render in a BUI Dialog with draft state
+- **AND** closing the dialog returns focus to its Filters trigger

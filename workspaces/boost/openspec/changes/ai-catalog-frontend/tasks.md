@@ -4,14 +4,14 @@
 
 - [ ] 1.1 Scaffold `plugins/boost` via `backstage-cli new` (NFS frontend-plugin template). Do not create plugin files manually — if the CLI fails, report the error.
 - [ ] 1.2 Configure `createFrontendPlugin` with `PageBlueprint` at `/ai-catalog` as default export
-- [ ] 1.3 Add `EntityCardBlueprint` stubs (summary, download, version) with `isAiAsset` filter
-- [ ] 1.4 Add `EntityContentBlueprint` stub (usage tab) with `isAiAsset` filter
+- [ ] 1.3 Add `EntityCardBlueprint` extensions (summary, adoption, asset location, version) with `isAiAsset` filter
+- [ ] 1.4 Use standard Catalog TechDocs as the only documentation tab; do not register a Boost Usage extension
 - [ ] 1.5 Implement `isAiAsset(entity)` condition filter checking kind + `spec.type`
 - [ ] 1.6 Implement `useAiAssets(filters)` hook wrapping `catalogApiRef`
 - [ ] 1.7 Create placeholder `AiCatalogPage` component
 - [ ] 1.8 Scaffold dev app and backend: run `npx @backstage/create-app` in a temp directory, copy `packages/app` and `packages/backend` into the boost workspace, then adapt. Do not create these packages manually — if the CLI fails, report the error.
 - [ ] 1.9 Adapt dev app to NFS pattern (createApp from frontend-defaults, nav module, sign-in module) and dev backend (app-backend, catalog-backend, auth + guest provider, boost-backend)
-- [ ] 1.10 Create sample `catalog-info.yaml` fixtures for all AI asset types (AiResource/skill, AiResource/rule, API/mcp-server, Component/ai-agent, Resource/ai-model) with `rhdh.io/ai-asset-*` annotations
+- [ ] 1.10 Create sample fixtures covering every supported kind/type pair, including standalone `Resource/ai-model` and `AiResource/skill-bundle`
 - [ ] 1.11 Add `app-config.yaml` with catalog fixture locations
 - [ ] 1.12 Set up i18n scaffold: translation resource file, TranslationBlueprint module
 - [ ] 1.13 Add first unit test using `TestApiProvider` + `renderInTestApp`
@@ -20,11 +20,11 @@
 
 ## 2. Browse Page with Search and Filters (RHIDP-15166)
 
-- [ ] 2.1 Implement `AiCatalogPage` with responsive card grid layout (BUI Grid.Root/Grid.Item, 3 columns desktop, 1 mobile)
-- [ ] 2.2 Implement `AiAssetCard` with BUI Card — name, description, category badge, lifecycle, tags, owner, version, source
-- [ ] 2.3 Add category grouping (tabs or section headers for each asset category)
+- [ ] 2.1 Implement `AiCatalogPage` with the responsive BUI grid (1, 2, or 4 columns) and compact filter Dialog at 768px and below
+- [ ] 2.2 Implement `AiAssetCard` with a static Type Badge, name, description, tags, linked owner, and provider
+- [ ] 2.3 Derive Type choices from visible entities in canonical taxonomy order
 - [ ] 2.4 Implement debounced search bar (BUI SearchField, 300ms, filters by name/description/tags)
-- [ ] 2.5 Implement filter controls — category (CheckboxGroup), lifecycle (CheckboxGroup), tags (Select multi), owner (SearchAutocomplete), source (CheckboxGroup)
+- [ ] 2.5 Render the enabled Type, provider, owner, and tag definitions through shared BUI multi-select controls
 - [ ] 2.6 Filters combine as AND; URL query param sync for all filter + search state
 - [ ] 2.7 Add client-side pagination (BUI TablePagination) and sort control (name, last updated)
 - [ ] 2.8 Implement loading state (BUI Skeleton cards), empty state ("No AI assets match" + clear-filters), error state (BUI Alert + Retry)
@@ -36,19 +36,16 @@
 
 ## 3. Entity Page Extensions and Adoption Actions (RHIDP-15167)
 
-- [ ] 3.1 Implement `AiAssetSummaryCard` — category badge, version, source, lifecycle
-- [ ] 3.2 Implement `DownloadAdoptCard` — conditional on `spec.location.type`:
-  - git: Download button, calls backend proxy, loading spinner, error toast
-  - oci: BUI Tabs for docker/podman toggle, pull command from `spec.location.target`, Copy button
-  - absent: card not rendered
-- [ ] 3.3 Implement `VersionListCard` — list all versions, highlight current/recommended, click navigates
-- [ ] 3.4 Implement `UsageTab` — TechDocs when `backstage.io/techdocs-ref` present, external links fallback, "Contact owner" when permission missing (defaults to allow until RHDHPLAN-1508 lands)
-- [ ] 3.5 Wire all cards and tab into plugin via EntityCardBlueprint/EntityContentBlueprint with `isAiAsset` filter
-- [ ] 3.6 Add backend download proxy route in `boost-backend`: `GET /api/boost/catalog/download` — accepts entity ref, resolves `spec.location.target`, authenticates to GitHub via `@backstage/integration`, streams ZIP
-- [ ] 3.7 Permission check on download proxy (catalog entity read permission, AI Catalog permissions when available)
+- [ ] 3.1 Implement `SummaryCard` with `rationale` and `models.available` only
+- [ ] 3.2 Implement `AdoptionCard` with safe skill/OCI/MCP copy actions, verified GitHub downloads, View Source fallback, and copy failure Retry
+- [ ] 3.3 Keep `entity-card:boost/version-list` compatibility while showing only the current annotated version
+- [ ] 3.4 Implement `AssetLocationCard` with validated, deduplicated Git and OCI artifact sources
+- [ ] 3.5 Wire all four cards through EntityCardBlueprint and remove `entity-content:boost/usage`
+- [ ] 3.6 Use direct frontend links for verified downloads; do not add a backend proxy in this change
+- [ ] 3.7 Leave existing documentation permission constants/backend enforcement unchanged for separately scoped work
 - [ ] 3.8 i18n: all user-facing strings via translation resources
 - [ ] 3.9 WCAG 2.1 AA for all interactive elements
-- [ ] 3.10 Unit tests for each card/tab, RBAC-gated rendering, download/copy behavior
+- [ ] 3.10 Unit tests for Summary exclusions, Adoption safety/retry, Asset Location validation, current Version behavior, and extension wiring
 
 ## 4. Extensible Browse Filters via NFS (RHIDP-15449)
 
@@ -56,14 +53,14 @@
 - [ ] 4.2 Create single `filterDefinitionDataRef` via `createExtensionDataRef<FilterDefinition>` in same file
 - [ ] 4.3 Create `AiCatalogFilterBlueprint` via `createExtensionBlueprint` — kind `ai-catalog-filter`, attaches to `page:boost/ai-catalog` input `filters`, params are `FilterDefinition` fields, no config schema. Factory outputs the `FilterDefinition` via the single data ref.
 - [ ] 4.4 Create `src/filters/builtInFilterDefinitions.ts` with 4 plain `FilterDefinition` objects:
-  - `categoryFilter` — urlParam `type`, getOptions from `getAllCategories()`, matchEntity checks `spec.type`, priority 100
+  - `categoryFilter` — urlParam `type`, getOptions from supported types present in visible entities while preserving canonical order, matchEntity checks `spec.type`, priority 100
   - `providerFilter` — urlParam `provider`, getOptions from `rhdh.io/ai-asset-source` annotation, priority 200
   - `ownerFilter` — urlParam `owner`, getOptions from `spec.owner`, priority 300
   - `tagsFilter` — urlParam `tag`, getOptions from `metadata.tags`, priority 400
 - [ ] 4.5 Register 4 built-in filters as `AiCatalogFilterBlueprint.make(...)` extensions in `plugin.tsx`, add to `createFrontendPlugin({ extensions: [...] })`
 - [ ] 4.6 Upgrade `aiCatalogPage` to `PageBlueprint.makeWithOverrides` with `name: 'ai-catalog'` — declare `filters` input via `createExtensionInput` accepting `ai-catalog-filter` extensions. Factory resolves `FilterDefinition[]`, sorts by priority, passes to page component as prop.
 - [ ] 4.7 Refactor `FilterSidebar` — receive `FilterDefinition[]` + URL values. Map over definitions, render `<Select>` for each using `getOptions(allEntities)`. Return `null` when array is empty.
-- [ ] 4.8 Refactor `useUrlFilters` — accept `urlParam[]` from resolved definitions instead of hardcoded param names. Replace `setCategory`/`setProvider`/`setOwner`/`setTag` with generic `setFilter(urlParam, values)`. Keep `setSearch`, `setViewMode`, `setPage`, `setPageSize` unchanged. `clearFilters` resets registered filter params + search only (preserves view/pageSize).
+- [ ] 4.8 Refactor `useUrlFilters` — accept `urlParam[]`, expose generic single and atomic filter actions, validate view/page/pageSize, and repair invalid URL state with history replacement. `clearFilters` resets registered filter params + search only (preserves view/pageSize).
 - [ ] 4.9 Refactor `applyEntityFilters` in `entityHelpers.ts` — replace 5 hardcoded `if` blocks with one loop: for each `FilterDefinition` with active values, call `matchEntity(entity, values)`. AND logic. Search filter stays built-in. Remove old `EntityFilters` interface.
 - [ ] 4.10 Update `AiCatalogPage.tsx` — receive `FilterDefinition[]` from page factory, pass to `FilterSidebar` and `useUrlFilters`. `hasActiveFilters` checks all registered urlParams dynamically.
 - [ ] 4.11 Export `AiCatalogFilterBlueprint` and `FilterDefinition` from `src/index.ts`
@@ -92,10 +89,10 @@
 
 - [ ] 6.1 Install `@playwright/test` and `@backstage/e2e-test-utils` as devDependencies
 - [ ] 6.2 Create `playwright.config.ts` at workspace root — `webServer` starts `yarn start`, `testDir: 'e2e-tests'`, NFS-only (no `APP_MODE`)
-- [ ] 6.3 Add Playwright projects for at least `en` and one non-English locale (e.g., `ja`) with separate ports
-- [ ] 6.4 Create `e2e-tests/test_yamls/` with per-locale `app-config-e2e-*.yaml` overrides (baseUrl, backend port, CORS)
+- [ ] 6.3 Validate 1440px, 1024px, 768px, and mobile widths, including 200% zoom and theme media settings
+- [ ] 6.4 Cover compact BUI Dialog Apply/Cancel and focus restoration
 - [ ] 6.5 Add `package.json` scripts: `test:e2e` → `playwright test`, `playwright` → forwarding script
-- [ ] 6.6 Create `e2e-tests/utils/translations.ts` — `getTranslations(locale)` helper loading messages from plugin translation modules
+- [ ] 6.6 Use the plugin translation source for stable UI labels
 - [ ] 6.7 Create `e2e-tests/utils/accessibility.ts` — axe-core audit helper with WCAG 2.1 AA tags, attaches results to `TestInfo`
 - [ ] 6.8 Test: browse page renders card grid with fixture data — verify cards visible using translation keys
 - [ ] 6.9 Test: search filters cards by keyword — type in search, verify URL updates, cards filtered
@@ -108,7 +105,7 @@
 - [ ] 6.16 Test: sort control — change sort order, verify card reordering
 - [ ] 6.17 Accessibility: axe-core audit on browse page (unfiltered)
 - [ ] 6.18 Accessibility: axe-core audit on browse page (with active filters)
-- [ ] 6.19 Verify same tests pass for non-English locale project
+- [ ] 6.19 Verify light, dark, and forced/high-contrast media settings without page-level horizontal overflow
 
 ## 7. Dynamic Plugin Export and Overlay Registration (RHIDP-15481)
 
@@ -117,11 +114,11 @@
 - [ ] 7.3 Run `yarn export-dynamic` and verify `dist-dynamic/` is produced without errors
 - [ ] 7.4 Create `plugins/boost/app-config.dynamic.yaml` with default `app.extensions` config:
   - `page:boost/ai-catalog` at `/ai-catalog`
-  - `entity-card:boost/summary`, `entity-card:boost/adoption`, `entity-card:boost/version-list` with AI asset filter
-  - `entity-content:boost/usage` tab with title and group
+  - `entity-card:boost/summary`, `entity-card:boost/adoption`, `entity-card:boost/asset-location`, `entity-card:boost/version-list` with AI asset filter
+  - no Boost entity-content extension; standard TechDocs is authoritative
 - [ ] 7.5 Add boost frontend plugin entry to `redhat-developer/rhdh-plugin-export-overlays` — PR with overlay config for OCI image build
 - [ ] 7.6 Update workspace `dynamic-plugins-image-reference.yaml` with the published OCI image ref for the frontend plugin
 - [ ] 7.7 Verify plugin loads in RHDH with `ENABLE_STANDARD_MODULE_FEDERATION=true` — AI Catalog nav item appears, browse page renders
 - [ ] 7.8 Verify entity page extensions mount on AI asset entities and are absent on non-AI entities
-- [ ] 7.9 Verify adopter overrides via `app.extensions` — disable a card, rename a tab, change entity filter
+- [ ] 7.9 Verify adopter overrides via `app.extensions` — disable a card or change an entity filter
 - [ ] 7.10 Verify `page:boost/ai-catalog: false` removes the nav item and page

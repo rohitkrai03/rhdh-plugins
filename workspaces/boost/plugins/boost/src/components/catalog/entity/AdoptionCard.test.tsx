@@ -17,7 +17,7 @@
 import { type Entity } from '@backstage/catalog-model';
 import { EntityProvider } from '@backstage/plugin-catalog-react';
 import { renderInTestApp } from '@backstage/test-utils';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 
 import { AdoptionCard } from './AdoptionCard';
 
@@ -140,15 +140,22 @@ describe('AdoptionCard', () => {
     expect(screen.getByText('Copy')).toBeInTheDocument();
   });
 
-  it('renders podman pull command for OCI-sourced entities', async () => {
+  it('renders Docker by default and a Podman alternative without oci://', async () => {
     await renderWithEntity(ociEntity);
 
     expect(
       screen.getByText(
-        'podman pull oci://registry.example.com/tools/custom-ai-tool:latest',
+        'docker pull registry.example.com/tools/custom-ai-tool:latest',
       ),
     ).toBeInTheDocument();
-    expect(screen.getByText('Copy')).toBeInTheDocument();
+    expect(screen.queryByText(/oci:\/\//)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Podman' }));
+    expect(
+      screen.getByText(
+        'podman pull registry.example.com/tools/custom-ai-tool:latest',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('renders Download ZIP button for git-sourced entities', async () => {
@@ -164,6 +171,12 @@ describe('AdoptionCard', () => {
       screen.getByText('https://mcp.example.com/github'),
     ).toBeInTheDocument();
     expect(screen.getByText('Copy')).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Copy URL to clipboard' }),
+    );
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      'https://mcp.example.com/github',
+    );
   });
 
   it('renders nothing for entities with no actionable metadata', async () => {
@@ -185,22 +198,82 @@ describe('AdoptionCard', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Copied')).toBeInTheDocument();
+      expect(copyButton).toHaveTextContent('Copied');
     });
   });
 
-  it('opens the git archive URL with noopener,noreferrer when Download ZIP is clicked', async () => {
-    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
-
+  it('renders the verified git archive as a safe external link', async () => {
     await renderWithEntity(gitEntity);
-    fireEvent.click(screen.getByText('Download ZIP'));
-
-    expect(openSpy).toHaveBeenCalledWith(
+    expect(screen.getByRole('link', { name: 'Download ZIP' })).toHaveAttribute(
+      'href',
       'https://api.github.com/repos/example/no-hardcoded-secrets-rule/zipball',
-      '_blank',
-      'noopener,noreferrer',
     );
+    expect(screen.getByRole('link', { name: 'Download ZIP' })).toHaveAttribute(
+      'rel',
+      'noopener noreferrer',
+    );
+  });
 
-    openSpy.mockRestore();
+  it('uses View Source for Git subpaths instead of guessing an archive', async () => {
+    await renderWithEntity({
+      ...gitEntity,
+      spec: {
+        ...gitEntity.spec,
+        location: {
+          type: 'git',
+          target: 'https://github.com/example/repo/tree/main/rules',
+        },
+      },
+    });
+
+    expect(screen.getByRole('link', { name: 'View Source' })).toHaveAttribute(
+      'href',
+      'https://github.com/example/repo/tree/main/rules',
+    );
+    expect(screen.queryByText('Download ZIP')).not.toBeInTheDocument();
+  });
+
+  it('shows a translated inline error and retries a failed copy', async () => {
+    const writeText = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('denied'))
+      .mockResolvedValueOnce(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    await renderWithEntity(skillEntity);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Copy command to clipboard' }),
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('Copy failed');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Copy command to clipboard' }),
+      ).toHaveTextContent('Copied'),
+    );
+  });
+
+  it('cleans up the success timer when unmounted', async () => {
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+    const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+    const rendered = await renderWithEntity(skillEntity);
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Copy command to clipboard' }),
+      );
+    });
+    const timerIndex = setTimeoutSpy.mock.calls.findIndex(
+      call => call[1] === 2000,
+    );
+    expect(timerIndex).toBeGreaterThanOrEqual(0);
+    const timerHandle = setTimeoutSpy.mock.results[timerIndex].value;
+
+    rendered.unmount();
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(timerHandle);
+    setTimeoutSpy.mockRestore();
+    clearTimeoutSpy.mockRestore();
   });
 });

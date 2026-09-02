@@ -73,13 +73,14 @@ const mockCatalogApi: Pick<jest.Mocked<CatalogApi>, 'getEntities'> = {
   getEntities: jest.fn(),
 };
 
-function renderPage() {
+function renderPage(initialEntry = '/') {
   return renderInTestApp(
     <TestApiProvider
       apis={[[catalogApiRef, mockCatalogApi as unknown as CatalogApi]]}
     >
       <AiCatalogPage filters={defaultFilters} />
     </TestApiProvider>,
+    { routeEntries: [initialEntry] },
   );
 }
 
@@ -92,6 +93,9 @@ describe('AiCatalogPage', () => {
     mockCatalogApi.getEntities.mockReturnValue(new Promise(() => {}));
     await renderPage();
     expect(screen.getAllByTestId('loading-skeleton').length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId('loading-filter-skeleton')).toHaveLength(
+      defaultFilters.length,
+    );
   });
 
   it('renders card grid with entities', async () => {
@@ -138,5 +142,28 @@ describe('AiCatalogPage', () => {
     expect(
       screen.getByText(`${msg.toolbar.allPrefix} (2)`),
     ).toBeInTheDocument();
+  });
+
+  it('renders desktop and compact filter compositions from the same state', async () => {
+    mockCatalogApi.getEntities.mockResolvedValue({ items: mockEntities });
+    await renderPage();
+
+    await waitFor(() =>
+      expect(screen.getByText('Code Review Skill')).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole('complementary', { name: 'Filters' }),
+    ).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Filters' })).toBeDefined();
+  });
+
+  it('resets an out-of-range page and renders the first page', async () => {
+    mockCatalogApi.getEntities.mockResolvedValue({ items: mockEntities });
+    await renderPage('/?page=99');
+
+    await waitFor(() =>
+      expect(screen.getByText('Code Review Skill')).toBeInTheDocument(),
+    );
+    expect(screen.getByText('Developer Assistant')).toBeInTheDocument();
   });
 });

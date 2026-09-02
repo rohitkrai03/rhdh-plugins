@@ -24,8 +24,10 @@ import type { Entity } from '@backstage/catalog-model';
  * | Skills         | AiResource        | skill            |
  * | Rules          | AiResource        | rule             |
  * | Agents         | AiResource        | agent            |
+ * | Skill Bundles  | AiResource        | skill-bundle     |
  * | Model Servers  | AiModelServerAPI  | ai-model-server  |
  * | MCP Servers    | API               | mcp-server       |
+ * | Models         | Resource          | ai-model         |
  * | Tools          | Resource          | ai-tool          |
  * | Vector Stores  | Resource          | vector-store     |
  *
@@ -37,10 +39,10 @@ import type { Entity } from '@backstage/catalog-model';
  * @public
  */
 export const AI_ASSET_SPEC_TYPES: Record<string, Set<string>> = {
-  airesource: new Set(['skill', 'rule', 'agent']),
+  airesource: new Set(['skill', 'rule', 'agent', 'skill-bundle']),
   aimodelserverapi: new Set(['ai-model-server']),
   api: new Set(['mcp-server']),
-  resource: new Set(['ai-tool', 'vector-store']),
+  resource: new Set(['ai-model', 'ai-tool', 'vector-store']),
 };
 
 /**

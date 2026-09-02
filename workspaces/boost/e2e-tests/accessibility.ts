@@ -14,25 +14,22 @@
  * limitations under the License.
  */
 
-@layer components {
-  .command {
-    flex: 1;
-    padding: var(--bui-space-2) var(--bui-space-3);
-    background-color: var(--bui-bg-surface-0);
-    border-radius: var(--bui-radius-2);
-    font-size: var(--bui-font-size-1);
-    font-family: monospace;
-    overflow-x: auto;
-  }
+import AxeBuilder from '@axe-core/playwright';
+import { expect, type Page, type TestInfo } from '@playwright/test';
 
-  .copyRow {
-    min-width: 0;
-  }
+export async function expectNoAccessibilityViolations(
+  page: Page,
+  testInfo: TestInfo,
+  name: string,
+) {
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .disableRules(['nested-interactive'])
+    .analyze();
 
-  @media (max-width: 480px) {
-    .copyRow {
-      align-items: stretch;
-      flex-direction: column;
-    }
-  }
+  await testInfo.attach(`${name}-axe.json`, {
+    body: JSON.stringify(results, null, 2),
+    contentType: 'application/json',
+  });
+  expect(results.violations).toEqual([]);
 }

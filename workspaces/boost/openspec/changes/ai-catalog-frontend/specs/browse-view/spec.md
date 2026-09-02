@@ -1,87 +1,110 @@
 # Browse View
 
-> **Status: Draft** — Pre-implementation specification. Subject to change during implementation.
+> **Status: Implemented** — Reconciled with the 2.1 prototype using current BUI components.
 
-The AI Catalog browse page provides marketplace-style discovery for AI assets registered in the Backstage Software Catalog.
+The AI Catalog browse page provides marketplace-style discovery for AI assets visible through the Backstage Software Catalog.
 
-## Requirements
+## ADDED Requirements
 
-### Requirement: Card Grid Display
+### Requirement: BUI-First Card and Table Display
 
-AI assets render as a card grid grouped by category.
+The page MUST use the prototype for information hierarchy and interactions while using `@backstage/ui` 0.16.0 for component implementation, semantics, and theming.
 
 #### Scenario: Browse page loads with assets
 
 - **WHEN** the developer navigates to `/ai-catalog`
-- **THEN** the page displays a card grid of AI asset entities from the catalog
-- **AND** cards are grouped by category (skills, rules, MCP servers, agents, models)
-- **AND** each card shows name, description, category badge, lifecycle, tags, owner, version, and source
+- **THEN** the page displays a BUI card grid of AI asset entities returned by the Catalog API
+- **AND** each card shows Type, name, description, tags, linked owner, and provider
+- **AND** Type is a static BUI Badge with an icon/name and a color accent, so color is not the only distinction
+- **AND** the generic translated subtitle does not enumerate a fixed set of types
 
-#### Scenario: Card navigation to entity detail
+#### Scenario: Table view
 
-- **WHEN** the developer clicks an asset card
-- **THEN** the browser navigates to the catalog entity detail page for that entity (e.g., `/catalog/default/airesource/my-skill`)
-- **AND** the browse page state is preserved for back navigation
+- **WHEN** the developer selects table view
+- **THEN** columns appear in the order Name, Type, Provider, Owner, Description
+- **AND** names and owners link to their Catalog entity pages
 
 #### Scenario: Responsive layout
 
-- **WHEN** the viewport is desktop width
-- **THEN** the card grid renders 3 columns
-- **WHEN** the viewport is mobile width
-- **THEN** the card grid renders 1 column
+- **WHEN** available width changes
+- **THEN** the BUI grid renders 1, 2, or 4 columns at its registered breakpoints
+- **AND** it is not capped at two columns
+- **AND** the page does not create horizontal page-level overflow at 200% zoom
 
-### Requirement: Keyword Search
+### Requirement: Supported Taxonomy
 
-The search bar filters visible cards by keyword.
+The plugin MUST recognize every supported AI Catalog kind/type pair without changing stored Catalog data.
 
-#### Scenario: Search filters cards
+#### Scenario: Catalog query recognizes supported assets
 
-- **WHEN** the developer types a keyword in the search bar
-- **THEN** cards are filtered within 300ms (debounced)
-- **AND** matching is against entity name, description, and tags
+- **WHEN** Catalog entities are loaded
+- **THEN** these kind/type pairs are recognized case-insensitively:
+  - `AiResource`: `skill`, `rule`, `agent`, `skill-bundle`
+  - `AiModelServerAPI`: `ai-model-server`
+  - `API`: `mcp-server`
+  - `Resource`: `ai-model`, `ai-tool`, `vector-store`
+- **AND** presentation casing is normalized without modifying stored Catalog data
+- **AND** standalone `Resource/ai-model` entities are shown when supplied by any provider
 
-#### Scenario: Search state in URL
+### Requirement: URL-Backed Search, Filters, and Pagination
 
-- **WHEN** the developer types a search term
-- **THEN** the search term is reflected in the URL query params (`?q=...`)
-- **AND** loading the URL directly reproduces the same filtered view
+The page MUST persist valid discovery state in the URL and repair invalid state without adding history entries.
 
-### Requirement: Multi-Faceted Filters
+#### Scenario: Search filters assets
 
-Filter controls narrow the card grid by entity metadata.
+- **WHEN** the developer types a keyword
+- **THEN** cards are filtered within the 300ms debounce using name, title, description, and tags
+- **AND** the search term is persisted as `q` in the URL
 
-#### Scenario: Filters combine as AND
+#### Scenario: Desktop filters
 
-- **WHEN** the developer selects category "skill" AND lifecycle "production"
-- **THEN** only cards matching both criteria are shown
+- **WHEN** the viewport is wider than 768px
+- **THEN** the registered filters render in a sticky filter column
+- **AND** filters combine in AND logic
+- **AND** Type options contain only types present in Catalog entities visible to the current user, in canonical order
 
-#### Scenario: Filter state in URL
+#### Scenario: Compact filters apply atomically
 
-- **WHEN** filters are active
-- **THEN** filter state is persisted in URL query params
-- **AND** the URL is shareable and survives page refresh
-- **AND** back/forward browser navigation updates filters correctly
+- **WHEN** the viewport is 768px or narrower
+- **THEN** a Filters button opens a BUI Dialog containing draft selections
+- **AND** Apply updates every registered filter URL parameter atomically, resets page, and closes the dialog
+- **AND** Cancel or dismiss discards the draft
+- **AND** focus returns to the Filters button
 
-#### Scenario: Clear filters
+#### Scenario: Invalid URL state is repaired
 
-- **WHEN** the developer clears all filters
-- **THEN** the URL resets to the base path
-- **AND** the full unfiltered card grid is restored
+- **WHEN** `view` is not `grid` or `table`
+- **THEN** grid renders and the invalid parameter is removed with history replacement
+- **WHEN** `pageSize` is not 10, 20, or 50
+- **THEN** 20 is used and the invalid parameter is removed with history replacement
+- **WHEN** `page` is malformed, negative, or outside the current result range
+- **THEN** page zero renders and the invalid parameter is removed with history replacement
 
 ### Requirement: Loading, Empty, and Error States
 
+The page MUST provide responsive loading, empty, filtered-empty, and recoverable error states.
+
 #### Scenario: Loading state
 
-- **WHEN** the catalog API request is in progress
-- **THEN** skeleton cards are shown as loading placeholders
+- **WHEN** the Catalog request is in progress
+- **THEN** skeletons reflect the actual registered filter count
+- **AND** card skeletons use the same responsive 1/2/4-column composition as loaded cards
 
-#### Scenario: Empty state
+#### Scenario: Empty and error states
 
-- **WHEN** no assets match the current filters
-- **THEN** the page shows "No AI assets match your filters" with a clear-filters action
+- **WHEN** no assets match active filters
+- **THEN** a translated filtered-empty state offers Clear filters
+- **WHEN** no assets exist
+- **THEN** a translated catalog-empty state is shown
+- **WHEN** the Catalog request fails
+- **THEN** a translated error state offers Retry without crashing the RHDH shell
 
-#### Scenario: Error state
+### Requirement: Catalog Authorization
 
-- **WHEN** the catalog API is unreachable
-- **THEN** the page shows an error message with a Retry button
-- **AND** the error does not crash the RHDH shell (error boundary)
+Browse results and derived filter choices MUST use only entities returned by the standard authorized Catalog query.
+
+#### Scenario: Visible entities govern browse data
+
+- **WHEN** the Catalog applies `catalog.entity.read`, including a conditional decision
+- **THEN** the page, cards, counts, and Type options use only the returned entities
+- **AND** no custom catalog-card permission is required

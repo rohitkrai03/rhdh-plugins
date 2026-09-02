@@ -14,10 +14,8 @@ import { FilterPredicate } from '@backstage/filter-predicates';
 import { FrontendModule } from '@backstage/frontend-plugin-api';
 import { IconElement } from '@backstage/frontend-plugin-api';
 import { JSX as JSX_2 } from 'react';
-import { JSXElementConstructor } from 'react';
 import { OverridableExtensionDefinition } from '@backstage/frontend-plugin-api';
 import { OverridableFrontendPlugin } from '@backstage/frontend-plugin-api';
-import { ReactElement } from 'react';
 import { RouteRef } from '@backstage/frontend-plugin-api';
 import { TranslationRef } from '@backstage/frontend-plugin-api';
 import { TranslationResource } from '@backstage/frontend-plugin-api';
@@ -193,6 +191,47 @@ const boostPlugin: OverridableFrontendPlugin<
         type?: EntityCardType;
       };
     }>;
+    'entity-card:boost/asset-location': OverridableExtensionDefinition<{
+      kind: 'entity-card';
+      name: 'asset-location';
+      config: {
+        filter: FilterPredicate | undefined;
+        type: 'content' | 'info' | undefined;
+      };
+      configInput: {
+        filter?: FilterPredicate | undefined;
+        type?: 'content' | 'info' | undefined;
+      };
+      output:
+        | ExtensionDataRef<JSX_2.Element, 'core.reactElement', {}>
+        | ExtensionDataRef<
+            (entity: Entity) => boolean,
+            'catalog.entity-filter-function',
+            {
+              optional: true;
+            }
+          >
+        | ExtensionDataRef<
+            string,
+            'catalog.entity-filter-expression',
+            {
+              optional: true;
+            }
+          >
+        | ExtensionDataRef<
+            EntityCardType,
+            'catalog.entity-card-type',
+            {
+              optional: true;
+            }
+          >;
+      inputs: {};
+      params: {
+        loader: () => Promise<JSX.Element>;
+        filter?: string | FilterPredicate | ((entity: Entity) => boolean);
+        type?: EntityCardType;
+      };
+    }>;
     'entity-card:boost/summary': OverridableExtensionDefinition<{
       kind: 'entity-card';
       name: 'summary';
@@ -273,85 +312,6 @@ const boostPlugin: OverridableFrontendPlugin<
         loader: () => Promise<JSX.Element>;
         filter?: string | FilterPredicate | ((entity: Entity) => boolean);
         type?: EntityCardType;
-      };
-    }>;
-    'entity-content:boost/usage': OverridableExtensionDefinition<{
-      kind: 'entity-content';
-      name: 'usage';
-      config: {
-        path: string | undefined;
-        title: string | undefined;
-        filter: FilterPredicate | undefined;
-        group: string | false | undefined;
-        icon: string | undefined;
-      };
-      configInput: {
-        path?: string | undefined;
-        title?: string | undefined;
-        filter?: FilterPredicate | undefined;
-        group?: string | false | undefined;
-        icon?: string | undefined;
-      };
-      output:
-        | ExtensionDataRef<string, 'core.routing.path', {}>
-        | ExtensionDataRef<JSX_2.Element, 'core.reactElement', {}>
-        | ExtensionDataRef<
-            RouteRef<AnyRouteRefParams>,
-            'core.routing.ref',
-            {
-              optional: true;
-            }
-          >
-        | ExtensionDataRef<
-            (entity: Entity) => boolean,
-            'catalog.entity-filter-function',
-            {
-              optional: true;
-            }
-          >
-        | ExtensionDataRef<
-            string,
-            'catalog.entity-filter-expression',
-            {
-              optional: true;
-            }
-          >
-        | ExtensionDataRef<string, 'catalog.entity-content-title', {}>
-        | ExtensionDataRef<
-            string,
-            'catalog.entity-content-group',
-            {
-              optional: true;
-            }
-          >
-        | ExtensionDataRef<
-            string | ReactElement<any, string | JSXElementConstructor<any>>,
-            'catalog.entity-content-icon',
-            {
-              optional: true;
-            }
-          >;
-      inputs: {};
-      params: {
-        defaultPath?: [Error: `Use the 'path' param instead`];
-        path: string;
-        defaultTitle?: [Error: `Use the 'title' param instead`];
-        title: string;
-        defaultGroup?: [Error: `Use the 'group' param instead`];
-        group?:
-          | (
-              | 'overview'
-              | 'documentation'
-              | 'development'
-              | 'deployment'
-              | 'operation'
-              | 'observability'
-            )
-          | (string & {});
-        icon?: string | ReactElement;
-        loader: () => Promise<JSX.Element>;
-        routeRef?: RouteRef;
-        filter?: string | FilterPredicate | ((entity: Entity) => boolean);
       };
     }>;
     'page:boost/ai-catalog': OverridableExtensionDefinition<{
@@ -457,37 +417,44 @@ export const boostTranslationRef: TranslationRef<
     readonly 'catalog.table.provider': string;
     readonly 'catalog.table.description': string;
     readonly 'catalog.filter.type': string;
+    readonly 'catalog.filter.filters': string;
     readonly 'catalog.filter.owner': string;
     readonly 'catalog.filter.provider': string;
     readonly 'catalog.filter.tag': string;
+    readonly 'catalog.filter.apply': string;
+    readonly 'catalog.filter.cancel': string;
     readonly 'catalog.page.title': string;
     readonly 'catalog.page.subtitle': string;
     readonly 'catalog.error.title': string;
     readonly 'catalog.error.description': string;
     readonly 'catalog.error.retry': string;
-    readonly 'catalog.tab.usageTitle': string;
-    readonly 'catalog.tab.usageDocumentation': string;
-    readonly 'catalog.tab.usageViewTechDocs': string;
-    readonly 'catalog.tab.usageExternalLinks': string;
-    readonly 'catalog.tab.usageNoDocumentation': string;
-    readonly 'catalog.tab.usagePermissionDenied': string;
-    readonly 'catalog.tab.usageContactOwner': string;
     readonly 'catalog.toolbar.search': string;
     readonly 'catalog.toolbar.allPrefix': string;
     readonly 'catalog.toolbar.viewGrid': string;
     readonly 'catalog.toolbar.viewTable': string;
+    readonly 'catalog.card.docker': string;
+    readonly 'catalog.card.podman': string;
+    readonly 'catalog.card.owner': string;
+    readonly 'catalog.card.provider': string;
     readonly 'catalog.card.summaryTitle': string;
     readonly 'catalog.card.adoptionTitle': string;
     readonly 'catalog.card.versionTitle': string;
     readonly 'catalog.card.versionCurrent': string;
+    readonly 'catalog.card.viewDetails': string;
+    readonly 'catalog.card.tags': string;
     readonly 'catalog.card.copyCommand': string;
     readonly 'catalog.card.copied': string;
     readonly 'catalog.card.copyAriaLabel': string;
+    readonly 'catalog.card.copyUrlAriaLabel': string;
+    readonly 'catalog.card.copyFailedTitle': string;
+    readonly 'catalog.card.copyFailedDescription': string;
+    readonly 'catalog.card.retryCopy': string;
     readonly 'catalog.card.adoptionDownloadZip': string;
+    readonly 'catalog.card.adoptionViewSource': string;
+    readonly 'catalog.card.assetLocationTitle': string;
+    readonly 'catalog.card.assetLocationGit': string;
+    readonly 'catalog.card.assetLocationOci': string;
     readonly 'catalog.card.modelsAvailableTitle': string;
-    readonly 'catalog.card.instructionsTitle': string;
-    readonly 'catalog.card.handoffDescriptionTitle': string;
-    readonly 'catalog.card.ragEnabledLabel': string;
     readonly 'catalog.empty.title': string;
     readonly 'catalog.empty.description': string;
     readonly 'catalog.empty.learnMore': string;

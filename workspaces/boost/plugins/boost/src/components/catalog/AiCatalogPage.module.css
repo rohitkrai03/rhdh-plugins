@@ -15,6 +15,12 @@
  */
 
 @layer components {
+  .page {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
   .layout {
     min-height: calc(100vh - var(--boost-shell-header-height, 120px));
   }
@@ -25,6 +31,14 @@
 
   .content {
     min-width: 0;
+  }
+
+  .mobileFilters {
+    display: none;
+  }
+
+  .search {
+    min-width: min(240px, 100%);
   }
 
   .loadingSidebar {
@@ -51,6 +65,43 @@
   }
 
   @media (max-width: 768px) {
+    .layout {
+      flex-direction: column;
+    }
+
+    .content {
+      width: 100%;
+      max-width: 100%;
+    }
+
+    .layout .desktopFilters,
+    .loadingSidebar {
+      display: none;
+    }
+
+    .mobileFilters {
+      display: block;
+    }
+
+    .toolbar,
+    .toolbar > *,
+    .toolbarActions {
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    .toolbarActions .search {
+      flex: 1 1 100%;
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    .toolbarActions .search input {
+      min-width: 0;
+    }
+
     .loadingGrid {
       grid-template-columns: 1fr;
     }
