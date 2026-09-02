@@ -3,19 +3,14 @@ import {
   Button,
   Container,
   Flex,
-  Header,
   Skeleton,
-  Tab,
-  TabList,
-  TabPanel,
-  Tabs,
   Text,
   ToggleButton,
   ToggleButtonGroup,
 } from '@backstage/ui';
-import { useState, type Key } from 'react';
+import type { Key } from 'react';
 import type { TimeWindow } from '../../api';
-import { useDeckData } from '../useDeckData';
+import { isInitialSnapshotUnavailable, useDeckData } from '../useDeckData';
 import {
   AttentionView,
   CostView,
@@ -24,7 +19,7 @@ import {
 } from './views';
 import styles from './styles.module.css';
 
-type View = 'attention' | 'executions' | 'cost' | 'data-health';
+export type DeckView = 'attention' | 'executions' | 'cost' | 'data-health';
 
 const windowLabels: Record<TimeWindow, string> = {
   '24h': '24 hours',
@@ -33,32 +28,43 @@ const windowLabels: Record<TimeWindow, string> = {
 };
 
 export interface FullsendDeckSurfaceProps {
+  view: DeckView;
+  window: TimeWindow;
+  onWindowChange: (window: TimeWindow) => void;
   entityRef?: string;
   entityName?: string;
 }
 
 export function FullsendDeckSurface({
+  view,
+  window,
+  onWindowChange,
   entityRef,
   entityName,
 }: FullsendDeckSurfaceProps) {
-  const [window, setWindow] = useState<TimeWindow>('7d');
-  const [view, setView] = useState<View>('attention');
   const result = useDeckData(window, entityRef);
   const scope = entityRef
     ? `Entity · ${entityName ?? entityRef}`
     : 'All entities';
+  const preparingInitialSnapshot = isInitialSnapshotUnavailable(result.error);
 
   return (
     <main className={styles.surface}>
-      <Header
-        title="Fullsend Deck"
-        description="Know what needs a human, then verify what the agents actually did."
-        tags={[{ label: scope }]}
-        metadata={[
-          { label: 'Mode', value: 'Read-only' },
-          { label: 'Window', value: windowLabels[window] },
-        ]}
-        customActions={
+      <Container py="5" className={styles.content}>
+        <Flex
+          align="end"
+          gap="4"
+          justify="between"
+          className={styles.contextBar}
+        >
+          <Flex gap="1" direction="column">
+            <Text variant="body-medium" weight="bold">
+              {scope}
+            </Text>
+            <Text variant="body-small" color="secondary">
+              Read-only · {windowLabels[window]}
+            </Text>
+          </Flex>
           <Flex align="end" gap="2" direction="column">
             <Text as="span" variant="body-x-small" color="secondary">
               Execution window
@@ -69,7 +75,7 @@ export function FullsendDeckSurface({
               selectedKeys={new Set([window])}
               onSelectionChange={keys => {
                 const next = Array.from(keys)[0];
-                if (isTimeWindow(next)) setWindow(next);
+                if (isTimeWindow(next)) onWindowChange(next);
               }}
             >
               <ToggleButton id="24h">24h</ToggleButton>
@@ -77,15 +83,21 @@ export function FullsendDeckSurface({
               <ToggleButton id="30d">30d</ToggleButton>
             </ToggleButtonGroup>
           </Flex>
-        }
-      />
-      <Container py="5">
+        </Flex>
         {result.error ? (
           <Alert
-            status="danger"
+            status={preparingInitialSnapshot ? 'info' : 'danger'}
             icon
-            title="Deck data is unavailable"
-            description={result.error.message}
+            title={
+              preparingInitialSnapshot
+                ? 'Preparing Deck data'
+                : 'Deck data is unavailable'
+            }
+            description={
+              preparingInitialSnapshot
+                ? 'The first artifact ingestion is still running. Deck will retry automatically; check the backend log if this persists beyond four minutes.'
+                : result.error.message
+            }
             customActions={<Button onPress={result.reload}>Try again</Button>}
           />
         ) : null}
@@ -97,31 +109,24 @@ export function FullsendDeckSurface({
               partial={result.data.overview.partial}
               refreshing={result.loading}
             />
-            <Tabs
-              selectedKey={view}
-              onSelectionChange={key => {
-                if (isView(key)) setView(key);
-              }}
-            >
-              <TabList aria-label="Fullsend Deck views">
-                <Tab id="attention">Attention</Tab>
-                <Tab id="executions">Executions</Tab>
-                <Tab id="cost">Cost</Tab>
-                <Tab id="data-health">Data health</Tab>
-              </TabList>
-              <TabPanel id="attention">
-                <AttentionView data={result.data} entityRef={entityRef} />
-              </TabPanel>
-              <TabPanel id="executions">
-                <ExecutionsView data={result.data} />
-              </TabPanel>
-              <TabPanel id="cost">
-                <CostView data={result.data} />
-              </TabPanel>
-              <TabPanel id="data-health">
-                <DataHealthView data={result.data} />
-              </TabPanel>
-            </Tabs>
+            {result.data.sync.sync.sources.length === 0 ? (
+              <Alert
+                status="warning"
+                icon
+                title="No data sources are reporting"
+                description="Configure at least one GitHub repository or a read-only filesystem export, then wait for the first completed sync. Until then, zero values do not represent healthy activity."
+              />
+            ) : null}
+            {view === 'attention' ? (
+              <AttentionView data={result.data} entityRef={entityRef} />
+            ) : null}
+            {view === 'executions' ? (
+              <ExecutionsView data={result.data} />
+            ) : null}
+            {view === 'cost' ? <CostView data={result.data} /> : null}
+            {view === 'data-health' ? (
+              <DataHealthView data={result.data} />
+            ) : null}
           </>
         ) : null}
       </Container>
@@ -175,15 +180,6 @@ function LoadingDeck() {
 
 function isTimeWindow(value: Key | undefined): value is TimeWindow {
   return value === '24h' || value === '7d' || value === '30d';
-}
-
-function isView(value: Key): value is View {
-  return (
-    value === 'attention' ||
-    value === 'executions' ||
-    value === 'cost' ||
-    value === 'data-health'
-  );
 }
 
 function formatDate(value: string) {

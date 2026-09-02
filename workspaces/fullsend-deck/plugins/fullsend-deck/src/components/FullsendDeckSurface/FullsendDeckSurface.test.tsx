@@ -4,21 +4,27 @@ import {
 } from '@backstage/frontend-test-utils';
 import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import {
   fixtureExecutionsResponse,
   fixtureOverviewResponse,
   fixtureSyncResponse,
   fixtureWorkItemsResponse,
 } from '../../testData';
-import { fullsendDeckApiRef, type FullsendDeckApi } from '../../api';
+import {
+  FullsendDeckRequestError,
+  fullsendDeckApiRef,
+  type FullsendDeckApi,
+  type TimeWindow,
+} from '../../api';
+import { FullsendDeckContextProvider } from '../FullsendDeckContext';
 import { FullsendDeckPage } from '../FullsendDeckPage';
-import { FullsendDeckSurface } from './FullsendDeckSurface';
+import { FullsendDeckSurface, type DeckView } from './FullsendDeckSurface';
 
 describe('FullsendDeckSurface', () => {
   it('renders readiness first and keeps workflow and agent outcomes distinct', async () => {
-    const user = userEvent.setup();
     const api = createApi();
-    render(<FullsendDeckSurface />, api);
+    const attention = render(<TestSurface />, api);
 
     expect(
       await screen.findByRole('heading', { name: 'Attention' }),
@@ -28,7 +34,8 @@ describe('FullsendDeckSurface', () => {
     ).toBeVisible();
     expect(screen.getAllByText('Actionable')).toHaveLength(2);
 
-    await user.click(screen.getByRole('tab', { name: 'Executions' }));
+    attention.unmount();
+    render(<TestSurface view="executions" />, api);
     expect(
       await screen.findByRole('heading', { name: 'Executions' }),
     ).toBeVisible();
@@ -40,7 +47,7 @@ describe('FullsendDeckSurface', () => {
 
   it('uses accessible evidence dialog focus and search states', async () => {
     const user = userEvent.setup();
-    render(<FullsendDeckSurface />, createApi());
+    render(<TestSurface />, createApi());
     const trigger = await screen.findByRole('button', { name: 'Evidence' });
     await user.click(trigger);
     expect(await screen.findByRole('dialog')).toBeVisible();
@@ -49,17 +56,17 @@ describe('FullsendDeckSurface', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
 
-    const search = screen.getByRole('searchbox', { name: 'Search work items' });
+    const search = screen.getByRole('searchbox', { name: 'Find work' });
     await user.type(search, 'does not exist');
     expect(screen.getByText('No matching work')).toBeVisible();
   });
 
   it('reloads all data when the time window changes', async () => {
     const api = createApi();
-    render(<FullsendDeckSurface />, api);
+    render(<TestSurface />, api);
     await screen.findByRole('heading', { name: 'Attention' });
     fireEvent.click(screen.getByRole('radio', { name: '24h' }));
-    await screen.findByText('24 hours');
+    await screen.findByText(/24 hours/);
     expect(api.getOverview).toHaveBeenLastCalledWith({
       window: '24h',
       entityRef: undefined,
@@ -73,12 +80,19 @@ describe('FullsendDeckSurface', () => {
 
   it('forwards canonical entity scope from the owned page deep link', async () => {
     const api = createApi();
-    window.history.replaceState(
-      {},
-      '',
-      '/fullsend-deck?entity=component:default/payments',
+    render(
+      <FullsendDeckContextProvider
+        value={{
+          entityRef: 'component:default/payments',
+          invalidEntityRef: false,
+          window: '7d',
+          setWindow: jest.fn(),
+        }}
+      >
+        <FullsendDeckPage view="attention" />
+      </FullsendDeckContextProvider>,
+      api,
     );
-    render(<FullsendDeckPage />, api);
     expect(
       await screen.findByText('Entity · component:default/payments'),
     ).toBeVisible();
@@ -86,16 +100,24 @@ describe('FullsendDeckSurface', () => {
       entityRef: 'component:default/payments',
       limit: 100,
     });
-    window.history.replaceState({}, '', '/fullsend-deck');
   });
 
   it('fails closed for a malformed entity deep link', async () => {
     const api = createApi();
-    window.history.replaceState({}, '', '/fullsend-deck?entity=not-an-entity');
-    render(<FullsendDeckPage />, api);
+    render(
+      <FullsendDeckContextProvider
+        value={{
+          invalidEntityRef: true,
+          window: '7d',
+          setWindow: jest.fn(),
+        }}
+      >
+        <FullsendDeckPage view="attention" />
+      </FullsendDeckContextProvider>,
+      api,
+    );
     expect(await screen.findByText('Invalid entity scope')).toBeVisible();
     expect(api.getOverview).not.toHaveBeenCalled();
-    window.history.replaceState({}, '', '/fullsend-deck');
   });
 
   it('shows explicit empty, partial, and safe error states', async () => {
@@ -105,19 +127,86 @@ describe('FullsendDeckSurface', () => {
         items: [],
       }),
     });
-    const first = render(<FullsendDeckSurface />, empty);
-    expect(await screen.findByText('Nothing needs attention')).toBeVisible();
+    const first = render(<TestSurface />, empty);
+    expect(await screen.findByText('No work in this snapshot')).toBeVisible();
     expect(screen.getByText('Partial data')).toBeVisible();
     first.unmount();
 
     const failed = createApi({
       getOverview: jest.fn().mockRejectedValue(new Error('Permission denied')),
     });
-    render(<FullsendDeckSurface />, failed);
+    render(<TestSurface />, failed);
     expect(await screen.findByText('Deck data is unavailable')).toBeVisible();
     expect(screen.getByText('Permission denied')).toBeVisible();
   });
+
+  it('does not present missing source data as healthy zero activity', async () => {
+    const api = createApi({
+      getWorkItems: jest.fn().mockResolvedValue({
+        ...fixtureWorkItemsResponse,
+        items: [],
+      }),
+      getSyncStatus: jest.fn().mockResolvedValue({
+        ...fixtureSyncResponse,
+        sync: {
+          ...fixtureSyncResponse.sync,
+          state: 'empty',
+          sources: [],
+        },
+      }),
+    });
+    const attention = render(<TestSurface />, api);
+
+    expect(
+      await screen.findByText('No data sources are reporting'),
+    ).toBeVisible();
+    expect(screen.getByText('No work has been ingested')).toBeVisible();
+
+    attention.unmount();
+    render(<TestSurface view="data-health" />, api);
+    expect(await screen.findByText('No configured sources')).toBeVisible();
+  });
+
+  it('presents the initial ingestion as a retrying preparation state', async () => {
+    const api = createApi({
+      getOverview: jest
+        .fn()
+        .mockRejectedValue(
+          new FullsendDeckRequestError(
+            'No completed ingestion snapshot is available',
+            503,
+            'SNAPSHOT_UNAVAILABLE',
+          ),
+        ),
+    });
+    render(<TestSurface />, api);
+
+    expect(await screen.findByText('Preparing Deck data')).toBeVisible();
+    expect(screen.getByText(/retry automatically/)).toBeVisible();
+    expect(
+      screen.queryByText('Deck data is unavailable'),
+    ).not.toBeInTheDocument();
+  });
 });
+
+function TestSurface({
+  view = 'attention',
+  entityRef,
+}: {
+  view?: DeckView;
+  entityRef?: string;
+}) {
+  const [window, setWindow] = useState<TimeWindow>('7d');
+  return (
+    <FullsendDeckSurface
+      view={view}
+      window={window}
+      onWindowChange={setWindow}
+      entityRef={entityRef}
+      entityName={entityRef}
+    />
+  );
+}
 
 function createApi(overrides: Partial<jest.Mocked<FullsendDeckApi>> = {}) {
   return {

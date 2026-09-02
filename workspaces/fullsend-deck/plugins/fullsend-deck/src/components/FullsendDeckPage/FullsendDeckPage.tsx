@@ -1,15 +1,19 @@
-import { Alert, Container, Header } from '@backstage/ui';
-import { FullsendDeckSurface } from '../FullsendDeckSurface';
+import { Alert, Container } from '@backstage/ui';
+import {
+  useFullsendDeckContext,
+  readEntityScope,
+} from '../FullsendDeckContext';
+import { FullsendDeckSurface, type DeckView } from '../FullsendDeckSurface';
 
-export function FullsendDeckPage() {
-  const entityRef = readEntityScope(window.location.search);
-  if (entityRef === null) {
+export interface FullsendDeckPageProps {
+  view: DeckView;
+}
+
+export function FullsendDeckPage({ view }: FullsendDeckPageProps) {
+  const context = useFullsendDeckContext();
+  if (context.invalidEntityRef) {
     return (
       <main>
-        <Header
-          title="Fullsend Deck"
-          description="Know what needs a human, then verify what the agents actually did."
-        />
         <Container py="5">
           <Alert
             status="danger"
@@ -24,19 +28,13 @@ export function FullsendDeckPage() {
 
   return (
     <FullsendDeckSurface
-      entityRef={entityRef}
-      entityName={entityRef ?? undefined}
+      view={view}
+      window={context.window}
+      onWindowChange={context.setWindow}
+      entityRef={context.entityRef}
+      entityName={context.entityRef}
     />
   );
 }
 
-export function readEntityScope(search: string): string | null | undefined {
-  const value = new URLSearchParams(search).get('entity')?.trim();
-  if (!value) return undefined;
-
-  return /^[a-z0-9][a-z0-9_.-]*:[a-z0-9][a-z0-9_.-]*\/[a-z0-9][a-z0-9_.-]*$/i.test(
-    value,
-  )
-    ? value.toLocaleLowerCase('en-US')
-    : null;
-}
+export { readEntityScope };
