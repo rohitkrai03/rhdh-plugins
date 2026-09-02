@@ -38,6 +38,17 @@ export const fullsendDeckApiRef = createApiRef<FullsendDeckApi>({
   id: 'plugin.fullsend-deck.service',
 });
 
+export class FullsendDeckRequestError extends Error {
+  public constructor(
+    message: string,
+    public readonly status: number,
+    public readonly code?: string,
+  ) {
+    super(message);
+    this.name = 'FullsendDeckRequestError';
+  }
+}
+
 export class FullsendDeckClient implements FullsendDeckApi {
   public constructor(
     private readonly discoveryApi: DiscoveryApi,
@@ -89,10 +100,12 @@ export class FullsendDeckClient implements FullsendDeckApi {
     const body: unknown = await response.json().catch(() => undefined);
     if (!response.ok) {
       const parsedError = apiErrorSchema.safeParse(body);
-      throw new Error(
+      throw new FullsendDeckRequestError(
         parsedError.success
           ? parsedError.data.error.message
-          : `Fullsend Deck request failed (${response.status})`,
+          : fallbackHttpError(response.status),
+        response.status,
+        parsedError.success ? parsedError.data.error.code : undefined,
       );
     }
     const parsed = schema.safeParse(body);
@@ -101,6 +114,16 @@ export class FullsendDeckClient implements FullsendDeckApi {
     }
     return parsed.data;
   }
+}
+
+function fallbackHttpError(status: number) {
+  if (status === 404) {
+    return 'Fullsend Deck backend is not available (404). Restart Backstage and verify the fullsend-deck backend plugin reaches readiness.';
+  }
+  if (status === 503) {
+    return 'Fullsend Deck backend is still starting (503). Wait for Backstage readiness and retry.';
+  }
+  return `Fullsend Deck request failed (${status})`;
 }
 
 interface RuntimeSchema<T> {

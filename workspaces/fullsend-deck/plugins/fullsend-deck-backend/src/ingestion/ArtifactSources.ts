@@ -17,6 +17,8 @@ export interface ArtifactSource {
   collect(now?: Date): Promise<SourceCollection>;
 }
 
+const GITHUB_ARTIFACT_CONCURRENCY = 4;
+
 export class FilesystemArtifactSource implements ArtifactSource {
   readonly source = 'filesystem';
 
@@ -83,21 +85,28 @@ export class GitHubArtifactSource implements ArtifactSource {
     let rateLimitRemaining: number | null = null;
     let successes = 0;
 
-    for (const repository of this.config.githubRepositories) {
-      try {
-        const result = await this.collectRepository(repository, attemptedAt);
-        workItems.push(...result.workItems);
-        runs.push(...result.runs);
+    const repositoryResults = await Promise.allSettled(
+      this.config.githubRepositories.map(repository =>
+        this.collectRepository(repository, attemptedAt),
+      ),
+    );
+    for (const [index, result] of repositoryResults.entries()) {
+      const repository = this.config.githubRepositories[index];
+      if (result.status === 'fulfilled') {
+        workItems.push(...result.value.workItems);
+        runs.push(...result.value.runs);
         rateLimitRemaining = minimumNullable(
           rateLimitRemaining,
-          result.rateLimitRemaining,
+          result.value.rateLimitRemaining,
         );
         successes += 1;
-      } catch (error) {
+      } else {
         diagnostics.push({
-          source: `github:${repository.repository}`,
+          source: `github:${
+            repository?.repository ?? `repository-${index + 1}`
+          }`,
           level: 'error',
-          message: safeMessage(error),
+          message: safeMessage(result.reason),
         });
       }
     }
@@ -145,21 +154,23 @@ export class GitHubArtifactSource implements ArtifactSource {
           : {}),
       this.request,
     );
-    const pulls = await client.json<GitHubPull[]>(
-      `/repos/${repository.repository}/pulls?state=all&per_page=100&sort=updated&direction=desc`,
-    );
-    const issues = await client.json<GitHubIssue[]>(
-      `/repos/${repository.repository}/issues?state=all&per_page=100&sort=updated&direction=desc`,
-    );
+    const [pulls, issues, artifacts] = await Promise.all([
+      client.json<GitHubPull[]>(
+        `/repos/${repository.repository}/pulls?state=all&per_page=100&sort=updated&direction=desc`,
+      ),
+      client.json<GitHubIssue[]>(
+        `/repos/${repository.repository}/issues?state=all&per_page=100&sort=updated&direction=desc`,
+      ),
+      client.json<{ artifacts: GitHubArtifact[] }>(
+        `/repos/${repository.repository}/actions/artifacts?per_page=100`,
+      ),
+    ]);
     const workItems = [
       ...pulls.map(pull => githubPullToWorkItem(repository, pull, snapshotAt)),
       ...issues
         .filter(issue => !issue.pull_request)
         .map(issue => githubIssueToWorkItem(repository, issue, snapshotAt)),
     ];
-    const artifacts = await client.json<{ artifacts: GitHubArtifact[] }>(
-      `/repos/${repository.repository}/actions/artifacts?per_page=100`,
-    );
     const candidates = artifacts.artifacts
       .filter(
         artifact =>
@@ -167,25 +178,30 @@ export class GitHubArtifactSource implements ArtifactSource {
           artifact.name.startsWith(this.config.githubArtifactNamePrefix),
       )
       .slice(0, this.config.maxArtifactsPerRepository);
-    const runs: ArtifactRun[] = [];
-    for (const artifact of candidates) {
-      const files = await client.zip(artifact.archive_download_url);
-      if (Object.keys(files).length === 0) continue;
-      const workflow = await client.json<GitHubWorkflowRun>(
-        `/repos/${repository.repository}/actions/runs/${artifact.workflow_run.id}`,
-      );
-      runs.push({
-        sourceKey: `github:${repository.repository}:artifact:${artifact.id}`,
-        repository: repository.repository,
-        entityRef: repository.entityRef,
-        providerRunId: String(workflow.id),
-        url: workflow.html_url,
-        branch: workflow.head_branch,
-        conclusion: workflow.conclusion,
-        createdAt: new Date(workflow.created_at).toISOString(),
-        files,
-      });
-    }
+    const runs = (
+      await mapConcurrent(
+        candidates,
+        GITHUB_ARTIFACT_CONCURRENCY,
+        async artifact => {
+          const files = await client.zip(artifact.archive_download_url);
+          if (Object.keys(files).length === 0) return null;
+          const workflow = await client.json<GitHubWorkflowRun>(
+            `/repos/${repository.repository}/actions/runs/${artifact.workflow_run.id}`,
+          );
+          return {
+            sourceKey: `github:${repository.repository}:artifact:${artifact.id}`,
+            repository: repository.repository,
+            entityRef: repository.entityRef,
+            providerRunId: String(workflow.id),
+            url: workflow.html_url,
+            branch: workflow.head_branch,
+            conclusion: workflow.conclusion,
+            createdAt: new Date(workflow.created_at).toISOString(),
+            files,
+          } satisfies ArtifactRun;
+        },
+      )
+    ).filter((run): run is ArtifactRun => run !== null);
     return { workItems, runs, rateLimitRemaining: client.rateLimitRemaining };
   }
 }
@@ -239,13 +255,38 @@ class GitHubClient {
     );
     const rateLimit = response.headers.get('x-ratelimit-remaining');
     if (rateLimit && Number.isInteger(Number(rateLimit))) {
-      this.rateLimitRemaining = Number(rateLimit);
+      this.rateLimitRemaining = minimumNullable(
+        this.rateLimitRemaining,
+        Number(rateLimit),
+      );
     }
     if (!response.ok) {
       throw new Error(`GitHub API returned ${response.status}`);
     }
     return response;
   }
+}
+
+async function mapConcurrent<T, Result>(
+  values: T[],
+  concurrency: number,
+  task: (value: T) => Promise<Result>,
+): Promise<Result[]> {
+  const results = new Array<Result>(values.length);
+  let nextIndex = 0;
+  const worker = async () => {
+    while (nextIndex < values.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await task(values[index]);
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, values.length) }, async () =>
+      worker(),
+    ),
+  );
+  return results;
 }
 
 async function findRunDirectories(root: string): Promise<string[]> {

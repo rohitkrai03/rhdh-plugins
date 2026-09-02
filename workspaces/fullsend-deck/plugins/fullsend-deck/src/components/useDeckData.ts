@@ -6,7 +6,13 @@ import type {
   WorkItemsResponse,
 } from '@red-hat-developer-hub/backstage-plugin-fullsend-deck-common';
 import { useCallback, useEffect, useState } from 'react';
-import { fullsendDeckApiRef, type TimeWindow } from '../api';
+import {
+  FullsendDeckRequestError,
+  fullsendDeckApiRef,
+  type TimeWindow,
+} from '../api';
+
+const INITIAL_SNAPSHOT_RETRY_MS = 5_000;
 
 export interface DeckData {
   overview: OverviewResponse;
@@ -26,6 +32,7 @@ export function useDeckData(window: TimeWindow, entityRef?: string) {
 
   useEffect(() => {
     let active = true;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
     setState(previous => ({ ...previous, loading: true, error: undefined }));
     Promise.all([
       api.getOverview({ window, entityRef }),
@@ -43,20 +50,34 @@ export function useDeckData(window: TimeWindow, entityRef?: string) {
       })
       .catch(error => {
         if (active) {
+          const normalized =
+            error instanceof Error
+              ? error
+              : new Error('Fullsend Deck could not load');
           setState({
             loading: false,
-            error:
-              error instanceof Error
-                ? error
-                : new Error('Fullsend Deck could not load'),
+            error: normalized,
           });
+          if (isInitialSnapshotUnavailable(normalized)) {
+            retryTimer = setTimeout(() => {
+              if (active) setRequest(value => value + 1);
+            }, INITIAL_SNAPSHOT_RETRY_MS);
+          }
         }
       });
     return () => {
       active = false;
+      if (retryTimer) clearTimeout(retryTimer);
     };
   }, [api, entityRef, request, window]);
 
   const reload = useCallback(() => setRequest(value => value + 1), []);
   return { ...state, reload };
+}
+
+export function isInitialSnapshotUnavailable(error?: Error) {
+  return (
+    error instanceof FullsendDeckRequestError &&
+    error.code === 'SNAPSHOT_UNAVAILABLE'
+  );
 }

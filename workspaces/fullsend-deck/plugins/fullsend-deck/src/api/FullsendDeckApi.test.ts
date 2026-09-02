@@ -10,7 +10,10 @@ import {
   fixtureSyncResponse,
   fixtureWorkItemsResponse,
 } from '../testData';
-import { FullsendDeckClient } from './FullsendDeckApi';
+import {
+  FullsendDeckClient,
+  FullsendDeckRequestError,
+} from './FullsendDeckApi';
 
 describe('FullsendDeckClient', () => {
   const discoveryApi = {
@@ -82,12 +85,45 @@ describe('FullsendDeckClient', () => {
         error: { code: 'FORBIDDEN', message: 'Read permission is required' },
       }),
     );
-    await expect(client.getOverview()).rejects.toThrow(
-      'Read permission is required',
-    );
+    const request = client.getOverview();
+    await expect(request).rejects.toThrow('Read permission is required');
+    await expect(request).rejects.toMatchObject({
+      status: 403,
+      code: 'FORBIDDEN',
+    });
 
     fetch.mockResolvedValueOnce(response(500, '<html>'));
     await expect(client.getOverview()).rejects.toThrow('request failed (500)');
+  });
+
+  it('explains unavailable and starting backend routes', async () => {
+    fetch.mockResolvedValueOnce(response(404, undefined));
+    await expect(client.getOverview()).rejects.toThrow(
+      'backend is not available (404)',
+    );
+
+    fetch.mockResolvedValueOnce(response(503, undefined));
+    await expect(client.getOverview()).rejects.toThrow(
+      'backend is still starting (503)',
+    );
+  });
+
+  it('retains structured initial snapshot state for automatic retry', async () => {
+    fetch.mockResolvedValueOnce(
+      response(503, {
+        error: {
+          code: 'SNAPSHOT_UNAVAILABLE',
+          message: 'No completed ingestion snapshot is available',
+        },
+      }),
+    );
+
+    await expect(client.getOverview()).rejects.toEqual(
+      expect.objectContaining<Partial<FullsendDeckRequestError>>({
+        status: 503,
+        code: 'SNAPSHOT_UNAVAILABLE',
+      }),
+    );
   });
 });
 
